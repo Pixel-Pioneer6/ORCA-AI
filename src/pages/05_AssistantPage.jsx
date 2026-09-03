@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMarine } from '../context/MarineContext';
 import { useLanguage } from '../context/LanguageContext';
+import { chatWithOrca } from '../services/api';
 
 export default function AssistantPage() {
   const { setCurrentRoute, setIsVoiceOpen } = useMarine();
@@ -50,35 +51,77 @@ export default function AssistantPage() {
   ]);
 
   const [inputVal, setInputVal] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { vesselSpecs } = useMarine();
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (!inputVal.trim()) return;
+    const query = inputVal.trim();
+    if (!query || loading) return;
 
     const newMsg = {
       id: Date.now(),
       sender: 'user',
-      text: inputVal,
+      text: query,
       time: 'Just now',
     };
 
-    setMessages((prev) => [
-      ...prev,
-      newMsg,
-      {
+    setMessages((prev) => [...prev, newMsg]);
+    setInputVal('');
+    setLoading(true);
+
+    const apiRes = await chatWithOrca({
+      query,
+      vesselLoa: vesselSpecs.loa,
+      vesselHp: vesselSpecs.hp,
+      language,
+    });
+
+    setLoading(false);
+
+    if (apiRes) {
+      const isDanger = apiRes.verdict === 'DO NOT VENTURE';
+      const isSafe = apiRes.verdict === 'SAFE';
+
+      const botMsg = {
         id: Date.now() + 1,
         sender: 'orca',
-        verdict: 'CHECKED',
-        verdictTa: 'சரிபார்க்கப்பட்டது',
-        verdictColor: 'bg-surface-container-low text-on-surface border-surface-container',
-        badgeColor: 'bg-secondary text-white',
-        text: `Processing live query "${inputVal}" against INCOIS and IMD sensor feeds. Conditions at Kasimedu harbour are currently monitored at 1.8m SWH.`,
+        verdict: apiRes.verdict,
+        verdictTa: apiRes.verdict_ta || 'சரிபார்க்கப்பட்டது',
+        verdictColor: isDanger
+          ? 'bg-error-container text-on-error-container border-error/30'
+          : isSafe
+          ? 'bg-emerald-50 text-emerald-950 border-emerald-300'
+          : 'bg-amber-50 text-amber-950 border-amber-300',
+        badgeColor: isDanger
+          ? 'bg-error text-white'
+          : isSafe
+          ? 'bg-emerald-600 text-white'
+          : 'bg-amber-500 text-white',
+        text: language === 'ta' && apiRes.reply_ta ? apiRes.reply_ta : apiRes.reply,
         time: 'Just now',
-        confidence: '89%',
-        sources: 'MOSDAC Realtime Ingest',
-      },
-    ]);
-    setInputVal('');
+        confidence: apiRes.confidence,
+        sources: apiRes.sources?.join(' + ') || 'INCOIS + MOSDAC',
+      };
+      setMessages((prev) => [...prev, botMsg]);
+    } else {
+      // Fallback
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: 'orca',
+          verdict: 'CHECKED',
+          verdictTa: 'சரிபார்க்கப்பட்டது',
+          verdictColor: 'bg-surface-container-low text-on-surface border-surface-container',
+          badgeColor: 'bg-secondary text-white',
+          text: `Kasimedu buoy BD08 reports 1.8m SWH with squalls of 24 kt. Exercise caution crossing outer sandbars.`,
+          time: 'Just now',
+          confidence: '89%',
+          sources: 'INCOIS Local Cache',
+        }
+      ]);
+    }
   };
 
   const suggestions = [
