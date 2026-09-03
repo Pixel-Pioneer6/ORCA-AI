@@ -67,7 +67,7 @@ export default function SidebarRail() {
   const nav = getNavItems();
 
   return (
-    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-primary-container text-white border-r border-white/10 flex flex-col justify-between py-pad-md z-40 shadow-xl overflow-y-auto">
+    <aside className="fixed left-0 top-24 bottom-0 w-64 bg-primary-container text-white border-r border-white/10 flex flex-col justify-between py-pad-md z-40 shadow-xl overflow-y-auto">
       <div className="flex flex-col gap-pad-md px-pad-sm">
         {/* Radar Telemetry Header */}
         <div className="flex items-center justify-between px-pad-xs py-1.5 rounded-lg bg-black/20 border border-white/5">

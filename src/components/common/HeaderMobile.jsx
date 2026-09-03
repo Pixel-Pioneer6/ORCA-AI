@@ -33,7 +33,7 @@ export default function HeaderMobile() {
   ];
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe">
+    <header className="fixed top-8 inset-x-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe">
       <div className="h-28 px-gutter-mobile flex flex-col justify-between py-pad-xs border-b border-surface-container-high/60">
         {/* Top Branding Row */}
         <div className="flex items-center justify-between gap-pad-xs">

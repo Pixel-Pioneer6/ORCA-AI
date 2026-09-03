@@ -1,10 +1,14 @@
 import React from 'react';
 import { useMarine } from '../../context/MarineContext';
 import { useLanguage } from '../../context/LanguageContext';
+import DisclaimerStrip from './DisclaimerStrip';
+import { getStaleness } from '../../lib/staleness';
 
 export default function SafetyVerdictCard({ onDetailClick }) {
-  const { safetyState, telemetry, vesselSpecs } = useMarine();
+  const { safety, telemetry, vesselSpecs, now } = useMarine();
   const { t } = useLanguage();
+  const safetyState = { SAFE: 'safe', CAUTION: 'caution', DO_NOT_VENTURE: 'danger', INSUFFICIENT_DATA: 'stale' }[safety.verdict] || 'caution';
+  const staleness = getStaleness(telemetry.retrievedAt, 'safetyVerdict', now);
 
   const stateConfigs = {
     safe: {

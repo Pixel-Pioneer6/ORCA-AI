@@ -20,7 +20,7 @@ export default function HeaderDesktop() {
   ];
 
   return (
-    <header className="fixed top-0 inset-x-0 z-50 h-16 bg-primary-container text-white px-gutter-desktop flex items-center justify-between border-b border-white/10 shadow-md">
+    <header className="fixed top-8 inset-x-0 z-50 h-16 bg-primary-container text-white px-gutter-desktop flex items-center justify-between border-b border-white/10 shadow-md">
       {/* Brand & Authority Badge */}
       <div className="flex items-center gap-pad-md">
         <div className="flex items-center gap-2.5">
