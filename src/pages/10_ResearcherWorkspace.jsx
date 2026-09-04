@@ -1,23 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ClimatologySstChart from '../components/charts/ClimatologySstChart';
 import SensorMatrixTable from '../components/tables/SensorMatrixTable';
 import EvidenceChip from '../components/common/EvidenceChip';
+import { downloadCsv, downloadJson } from '../lib/download';
 
 export default function ResearcherWorkspace() {
   const [variable, setVariable] = useState('sst');
   const [domain, setDomain] = useState('coromandel');
   const [timeRange, setTimeRange] = useState('30d');
   const [exportNotice, setExportNotice] = useState('');
+  const [exporting, setExporting] = useState(false);
+  // FR-3.4: real numpy-computed anomaly/trend stats (backend/agents/analytics_agent.py),
+  // not independently hand-picked constants that happened to look plausible.
+  const [analysis, setAnalysis] = useState(null);
 
-  const handleExport = (format) => {
-    setExportNotice(`Exporting dataset in ${format} format...`);
-    setTimeout(() => setExportNotice(''), 3000);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/analytics/anomaly')
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setAnalysis(data.analysis); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // FR-3.4/US-06 — a real downloadable file, including the real per-day
+  // z-score/anomaly analysis, not just the raw series.
+  const handleExport = async (format) => {
+    setExporting(true);
+    try {
+      const [tsRes, anomalyRes] = await Promise.all([
+        fetch('/api/v1/timeseries'),
+        fetch('/api/v1/analytics/anomaly'),
+      ]);
+      const data = await tsRes.json();
+      const anomalyData = await anomalyRes.json();
+      const zByDay = Object.fromEntries((anomalyData.analysis?.series || []).map((p) => [p.index + 1, p.z_score]));
+      const enrichedPoints = data.points.map((p) => ({ ...p, z_score: zByDay[p.day] ?? null }));
+      const stamp = new Date().toISOString().slice(0, 10);
+      if (format === 'CSV') {
+        downloadCsv(enrichedPoints, `orca_${variable}_${domain}_${stamp}.csv`);
+      } else {
+        downloadJson({ ...data, analysis: anomalyData.analysis }, `orca_${variable}_${domain}_${stamp}.json`);
+      }
+      setExportNotice(`Downloaded ${enrichedPoints.length} records (with anomaly z-scores) as ${format}.`);
+    } catch (err) {
+      setExportNotice('Export failed — backend unreachable. Try again once connectivity is restored.');
+    } finally {
+      setExporting(false);
+      setTimeout(() => setExportNotice(''), 4000);
+    }
   };
 
   return (
     <div className="flex flex-col gap-pad-lg pb-16">
       {/* TOP CONTEXT & ACTIONS BAR */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-pad-sm bg-surface-container-high px-pad-md py-2.5 rounded-xl border border-surface-container-highest">
+      <div id="researcher" className="scroll-mt-28 flex flex-col md:flex-row md:items-center justify-between gap-pad-sm bg-surface-container-high px-pad-md py-2.5 rounded-xl border border-surface-container-highest">
         <div className="flex items-center gap-2 text-on-surface">
           <span className="material-symbols-outlined text-secondary text-[22px]">science</span>
           <div>
@@ -31,20 +68,22 @@ export default function ResearcherWorkspace() {
         </div>
 
         {/* Action Cluster */}
-        <div className="flex items-center gap-2">
+        <div id="exports" className="scroll-mt-28 flex items-center gap-2">
           <button
-            onClick={() => handleExport('NetCDF-4')}
-            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary/90 flex items-center gap-1"
+            onClick={() => handleExport('JSON')}
+            disabled={exporting}
+            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs hover:bg-primary/90 flex items-center gap-1 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[15px]">file_download</span>
-            <span>Export NetCDF-4</span>
+            <span>Export Metadata (JSON)</span>
           </button>
           <button
             onClick={() => handleExport('CSV')}
-            className="px-3 py-1.5 rounded-lg border border-surface-container-high bg-surface-container-lowest text-on-surface text-xs font-bold hover:bg-surface-container flex items-center gap-1"
+            disabled={exporting}
+            className="px-3 py-1.5 rounded-lg border border-surface-container-high bg-surface-container-lowest text-on-surface text-xs font-bold hover:bg-surface-container flex items-center gap-1 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[15px]">table_view</span>
-            <span>CSV Table</span>
+            <span>{exporting ? 'Exporting…' : 'Download CSV'}</span>
           </button>
         </div>
       </div>
@@ -57,7 +96,7 @@ export default function ResearcherWorkspace() {
       )}
 
       {/* HORIZONTAL HIGH-DENSITY QUERY DECK */}
-      <div className="rounded-xl bg-surface-container-lowest p-pad-md border border-surface-container-high/80 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-pad-md">
+      <div id="map" className="scroll-mt-28 rounded-xl bg-surface-container-lowest p-pad-md border border-surface-container-high/80 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-pad-md">
         {/* Variable Selector */}
         <div>
           <label className="block text-[10px] font-bold uppercase text-on-surface-variant mb-1">
@@ -114,23 +153,35 @@ export default function ResearcherWorkspace() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-pad-sm">
         <div className="p-pad-sm rounded-xl bg-surface-container-lowest border border-surface-container-high/80 shadow-xs">
           <span className="text-[10px] uppercase font-bold text-on-surface-variant">Observed SST</span>
-          <div className="font-telemetry-lg text-xl font-bold text-on-surface mt-1">29.4°C</div>
-          <span className="text-[10px] text-amber-700 font-bold">+0.8°C Thermal Anomaly</span>
+          <div className="font-telemetry-lg text-xl font-bold text-on-surface mt-1">
+            {analysis ? `${analysis.observed_mean}°C` : '…'}
+          </div>
+          <span className="text-[10px] text-amber-700 font-bold">
+            {analysis ? `${analysis.mean_anomaly >= 0 ? '+' : ''}${analysis.mean_anomaly}°C Thermal Anomaly` : 'Loading…'}
+          </span>
         </div>
         <div className="p-pad-sm rounded-xl bg-surface-container-lowest border border-surface-container-high/80 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-on-surface-variant">30-Yr Baseline Mean</span>
-          <div className="font-telemetry-lg text-xl font-bold text-secondary mt-1">28.6°C</div>
+          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Baseline Mean</span>
+          <div className="font-telemetry-lg text-xl font-bold text-secondary mt-1">
+            {analysis ? `${analysis.climatological_mean}°C` : '…'}
+          </div>
           <span className="text-[10px] text-on-surface-variant">INCOIS Reanalysis</span>
         </div>
         <div className="p-pad-sm rounded-xl bg-surface-container-lowest border border-surface-container-high/80 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Chlorophyll-a Peak</span>
-          <div className="font-telemetry-lg text-xl font-bold text-emerald-700 mt-1">1.14 mg/m³</div>
-          <span className="text-[10px] text-emerald-700 font-medium">Active Coastal Upwelling</span>
+          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Anomalous Days (|z|≥2)</span>
+          <div className="font-telemetry-lg text-xl font-bold text-emerald-700 mt-1">
+            {analysis ? analysis.anomalous_day_count : '…'}
+          </div>
+          <span className="text-[10px] text-emerald-700 font-medium">of {analysis ? analysis.n_observations : 30} days</span>
         </div>
         <div className="p-pad-sm rounded-xl bg-surface-container-lowest border border-surface-container-high/80 shadow-xs">
-          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Model Convergence (R²)</span>
-          <div className="font-telemetry-lg text-xl font-bold text-secondary mt-1">0.942</div>
-          <span className="text-[10px] text-emerald-700 font-medium">98.2% Confidence</span>
+          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Trend Fit (R²)</span>
+          <div className="font-telemetry-lg text-xl font-bold text-secondary mt-1">
+            {analysis ? analysis.trend_r_squared : '…'}
+          </div>
+          <span className="text-[10px] text-emerald-700 font-medium">
+            {analysis ? `${analysis.trend_per_day >= 0 ? '+' : ''}${analysis.trend_per_day}°C/day trend` : 'Loading…'}
+          </span>
         </div>
       </div>
 
@@ -138,7 +189,9 @@ export default function ResearcherWorkspace() {
       <ClimatologySstChart />
 
       {/* Sensor Provenance Matrix Table */}
-      <SensorMatrixTable />
+      <div id="provenance" className="scroll-mt-28">
+        <SensorMatrixTable />
+      </div>
 
       {/* Institutional Evidence Badges */}
       <div className="flex items-center gap-2 flex-wrap text-xs">

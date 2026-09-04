@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMarine } from '../../context/MarineContext';
 
+// Each desktop dashboard (DdmoDashboard, PortDashboard, ResearcherWorkspace,
+// AuthorityDashboard) is one long scrolling page, not separate routes. This
+// rail previously called setCurrentRoute(item.id) for ids like 'forecast'/
+// 'areas'/'feed'/'brief' that map to no route at all (silent no-op), and
+// others ('map', 'safety') that resolved to a URL with no matching desktop
+// <Route>, falling back to the same Overview page every time — every click
+// looked broken. It's real in-page navigation now: clicking scrolls to the
+// matching section (see the `id="..."` anchors added to each dashboard
+// page), and a live IntersectionObserver highlights whichever section is
+// actually on screen as you scroll, not just whatever was last clicked.
 export default function SidebarRail() {
-  const { currentRole, currentRoute, setCurrentRoute, setIsVoiceOpen } = useMarine();
+  const { currentRole, setIsVoiceOpen } = useMarine();
+  const [activeSection, setActiveSection] = useState(null);
+  const observerRef = useRef(null);
 
   const getNavItems = () => {
     switch (currentRole) {
@@ -17,7 +29,7 @@ export default function SidebarRail() {
             { id: 'forecast', label: 'Forecast Outlook', icon: 'waves' },
             { id: 'areas', label: 'Affected Areas', icon: 'flood' },
             { id: 'feed', label: 'Incident Feed', icon: 'crisis_alert' },
-            { id: 'brief', label: 'Situation Brief', icon: 'description' },
+            { id: 'brief', label: 'Situation Brief', anchor: 'ddmo-kpi', icon: 'description' },
           ],
         };
       case 'port':
@@ -31,7 +43,7 @@ export default function SidebarRail() {
             { id: 'map', label: 'Harbour Map', icon: 'map' },
             { id: 'safety', label: 'Official Warnings (2)', icon: 'warning', alert: true },
             { id: 'forecast', label: '24h Forecast', icon: 'air' },
-            { id: 'berths', label: 'Berth Allocations', icon: 'dock' },
+            { id: 'berths', label: 'Berth Allocations', anchor: 'traffic', icon: 'dock' },
           ],
         };
       case 'researcher':
@@ -41,7 +53,7 @@ export default function SidebarRail() {
           items: [
             { id: 'researcher', label: 'Analytics Workspace', icon: 'analytics' },
             { id: 'map', label: 'Map Explorer', icon: 'explore' },
-            { id: 'queries', label: 'Saved Queries (3)', icon: 'bookmark' },
+            { id: 'queries', label: 'Saved Queries (3)', anchor: 'map', icon: 'bookmark' },
             { id: 'exports', label: 'Data Exports CSV/NetCDF', icon: 'file_download' },
             { id: 'provenance', label: 'Sensor Provenance', icon: 'verified' },
           ],
@@ -55,9 +67,9 @@ export default function SidebarRail() {
             { id: 'authority', label: 'Command Overview', icon: 'grid_view' },
             { id: 'triage', label: 'Regional Risk Triage', icon: 'shield' },
             { id: 'map', label: 'Marine Cartography', icon: 'map' },
-            { id: 'safety', label: 'Warnings (5)', icon: 'warning', alert: true },
-            { id: 'ports', label: 'Ports Monitored (19)', icon: 'anchor' },
-            { id: 'fisheries', label: 'Fisheries Readiness', icon: 'sailing' },
+            { id: 'safety', label: 'Warnings (5)', anchor: 'authority', icon: 'warning', alert: true },
+            { id: 'ports', label: 'Ports Monitored (19)', anchor: 'triage', icon: 'anchor' },
+            { id: 'fisheries', label: 'Fisheries Readiness', anchor: 'triage', icon: 'sailing' },
             { id: 'directives', label: 'Executive Directives', icon: 'gavel' },
           ],
         };
@@ -65,6 +77,43 @@ export default function SidebarRail() {
   };
 
   const nav = getNavItems();
+
+  // Scroll-spy: whichever section is nearest the top of the viewport wins.
+  // Re-runs whenever the nav config changes (role switch) since the anchor
+  // ids on the page differ per role.
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    const anchorIds = Array.from(new Set(nav.items.map((i) => i.anchor || i.id)));
+    const elements = anchorIds.map((id) => document.getElementById(id)).filter(Boolean);
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length > 0) {
+          const topMost = visible.reduce((a, b) => (a.boundingClientRect.top < b.boundingClientRect.top ? a : b));
+          setActiveSection(topMost.target.id);
+        }
+      },
+      { rootMargin: '-96px 0px -60% 0px', threshold: 0 }
+    );
+    elements.forEach((el) => observer.observe(el));
+    observerRef.current = observer;
+    setActiveSection(elements[0].id);
+
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRole]);
+
+  const handleNavClick = (item) => {
+    const targetId = item.anchor || item.id;
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSection(targetId);
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-24 bottom-0 w-64 bg-primary-container text-white border-r border-white/10 flex flex-col justify-between py-pad-md z-40 shadow-xl overflow-y-auto">
@@ -94,11 +143,11 @@ export default function SidebarRail() {
         {/* Nav Links */}
         <nav className="flex flex-col gap-1">
           {nav.items.map((item) => {
-            const isActive = currentRoute === item.id;
+            const isActive = activeSection === (item.anchor || item.id);
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentRoute(item.id)}
+                onClick={() => handleNavClick(item)}
                 className={`w-full px-3 py-2.5 rounded-lg text-left flex items-center justify-between transition-colors text-xs font-semibold ${
                   isActive
                     ? 'bg-secondary text-white shadow-sm font-bold'

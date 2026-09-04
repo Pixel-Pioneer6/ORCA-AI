@@ -2,25 +2,23 @@ import React, { useState } from 'react';
 import { useMarine } from '../context/MarineContext';
 
 export default function VesselProfilePage() {
-  const { vesselSpecs, setVesselSpecs, setCurrentRoute } = useMarine();
+  const { vesselSpecs, setVesselSpecs, setCurrentRoute, vesselThresholds, vesselClass } = useMarine();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ ...vesselSpecs });
   const [showSpecsExplainer, setShowSpecsExplainer] = useState(false);
 
   const handleSave = (e) => {
     e.preventDefault();
-    // Dynamically recalculate physical limits based on LOA and HP
     const parsedLoa = parseFloat(formData.loa) || 8.2;
     const parsedHp = parseFloat(formData.hp) || 9.9;
-    const computedMaxWave = parseFloat((parsedLoa * 0.18).toFixed(1)); // ~1.5m for 8.2m
-    const computedMaxWind = Math.round(14 + parsedHp * 0.4); // ~18 kt for 9.9hp
 
+    // Thresholds are NOT stored here — they're derived live from `loa` by the
+    // safety rule engine (src/lib/safetyEngine.js) via vesselThresholds, so
+    // editing LOA always re-derives the correct band, never a stale formula.
     setVesselSpecs({
       ...formData,
       loa: parsedLoa,
       hp: parsedHp,
-      maxWave: computedMaxWave,
-      maxWind: computedMaxWind,
     });
     setIsEditing(false);
   };
@@ -178,9 +176,10 @@ export default function VesselProfilePage() {
               <span className="text-[10px] text-on-surface-variant">Shallow Sandbar Draft</span>
             </div>
             <div className="p-2.5 rounded-lg bg-surface-container-low border border-surface-container">
-              <span className="text-[10px] uppercase font-bold text-on-surface-variant">Calculated Limit</span>
-              <div className="font-telemetry-sm text-sm font-bold text-secondary">{vesselSpecs.maxWave}m SWH</div>
-              <span className="text-[10px] text-amber-700 font-semibold">{vesselSpecs.maxWind} kt Max Wind</span>
+              <span className="text-[10px] uppercase font-bold text-on-surface-variant">Do-Not-Venture Limit</span>
+              <div className="font-telemetry-sm text-sm font-bold text-secondary">{vesselThresholds.doNotVenture.wave}m SWH</div>
+              <span className="text-[10px] text-amber-700 font-semibold">{vesselThresholds.doNotVenture.wind} kt Max Wind</span>
+              <span className="text-[9px] text-on-surface-variant block mt-0.5">Class: {vesselThresholds.label}</span>
             </div>
           </div>
         )}

@@ -1,36 +1,39 @@
 import React, { useState } from 'react';
 import { useMarine } from '../../context/MarineContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth, ROLE_VERIFICATION } from '../../context/AuthContext';
+
+const MARINE_TO_TIER = { fisher: 'fisherman', ddmo: 'ddmo', port: 'port', researcher: 'researcher', authority: 'authority' };
+const TIER_TO_MARINE = { fisherman: 'fisher', ddmo: 'ddmo', port: 'port', researcher: 'researcher', authority: 'authority' };
 
 export default function HeaderMobile() {
-  const { 
-    currentRole, 
-    setCurrentRole, 
-    setCurrentRoute, 
-    activeLocation, 
-    themeMode, 
-    setThemeMode 
+  const {
+    currentRole,
+    setCurrentRole,
+    setCurrentRoute,
+    activeLocation,
+    themeMode,
+    setThemeMode
   } = useMarine();
   const { language, setLanguage } = useLanguage();
+  const { isGuest, heldRoles, pendingRoles, identity, openAuth, signOut } = useAuth();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
 
+  // Previously cycled EN -> TA -> HI -> EN, skipping Malayalam entirely —
+  // there was no way to reach it from this quick-toggle button at all.
+  const LANGUAGE_CYCLE = ['en', 'ta', 'hi', 'ml'];
+  const LANGUAGE_LABELS = { en: 'EN', ta: 'தமிழ்', hi: 'हिन्दी', ml: 'മലയാളം' };
   const toggleLanguage = () => {
-    if (language === 'en') setLanguage('ta');
-    else if (language === 'ta') setLanguage('hi');
-    else setLanguage('en');
+    const next = LANGUAGE_CYCLE[(LANGUAGE_CYCLE.indexOf(language) + 1) % LANGUAGE_CYCLE.length];
+    setLanguage(next);
   };
 
   const toggleTheme = () => {
     setThemeMode(themeMode === 'light' ? 'dark' : 'light');
   };
 
-  const roles = [
-    { id: 'fisher', label: 'Fisherman (Mobile)', icon: 'sailing' },
-    { id: 'ddmo', label: 'DDMO Command', icon: 'flood' },
-    { id: 'port', label: 'Port Operator', icon: 'anchor' },
-    { id: 'researcher', label: 'Marine Researcher', icon: 'science' },
-    { id: 'authority', label: 'Senior Authority', icon: 'shield' },
-  ];
+  const icons = { fisher: 'sailing', ddmo: 'flood', port: 'anchor', researcher: 'science', authority: 'shield' };
+  const heldMarineRoles = ['fisher', ...heldRoles.map((t) => TIER_TO_MARINE[t]).filter(Boolean)];
 
   return (
     <header className="fixed top-8 inset-x-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe">
@@ -56,7 +59,7 @@ export default function HeaderMobile() {
             </div>
           </div>
 
-          {/* Controls: Language, Theme, Role Switcher */}
+          {/* Controls: Language, Theme, Auth/Role */}
           <div className="flex items-center gap-1.5">
             {/* Language Selector */}
             <button
@@ -66,7 +69,7 @@ export default function HeaderMobile() {
             >
               <span className="material-symbols-outlined text-[16px] text-secondary">translate</span>
               <span className="font-label-sm text-label-sm font-bold uppercase">
-                {language === 'en' ? 'EN' : language === 'ta' ? 'தமிழ்' : 'हिन्दी'}
+                {LANGUAGE_LABELS[language] || 'EN'}
               </span>
             </button>
 
@@ -81,40 +84,66 @@ export default function HeaderMobile() {
               </span>
             </button>
 
-            {/* Role Switcher Button */}
-            <div className="relative">
+            {isGuest ? (
               <button
-                onClick={() => setShowRoleMenu(!showRoleMenu)}
-                className="h-9 px-2.5 rounded-md bg-primary text-on-primary flex items-center gap-1 text-xs font-bold shadow-sm"
+                onClick={() => openAuth('fisherman')}
+                className="h-9 px-3 rounded-md bg-primary text-on-primary flex items-center gap-1 text-xs font-bold shadow-sm"
               >
-                <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                <span className="hidden xs:inline uppercase">{currentRole}</span>
+                <span className="material-symbols-outlined text-[16px]">login</span>
+                <span>Sign In</span>
               </button>
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={() => setShowRoleMenu(!showRoleMenu)}
+                  className="h-9 px-2.5 rounded-md bg-primary text-on-primary flex items-center gap-1 text-xs font-bold shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                  <span className="hidden xs:inline uppercase">{currentRole}</span>
+                </button>
 
-              {/* Role Dropdown */}
-              {showRoleMenu && (
-                <div className="absolute right-0 mt-2 w-52 rounded-xl bg-surface-container-lowest shadow-xl border border-outline-variant/30 py-1.5 z-50 animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-1.5 border-b border-surface-container text-[11px] font-label-sm uppercase font-bold text-on-surface-variant">
-                    Select Workstation Role
-                  </div>
-                  {roles.map((r) => (
+                {showRoleMenu && (
+                  <div className="absolute right-0 mt-2 w-60 rounded-xl bg-surface-container-lowest shadow-xl border border-outline-variant/30 py-1.5 z-50 animate-in fade-in zoom-in-95">
+                    <div className="px-3 py-1.5 border-b border-surface-container text-[11px] font-label-sm uppercase font-bold text-on-surface-variant flex items-center justify-between">
+                      <span>Your verified roles</span>
+                      {identity && <span className="normal-case font-mono text-[10px] text-secondary truncate max-w-[90px]">{identity.value}</span>}
+                    </div>
+                    {heldMarineRoles.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => { setCurrentRole(r); setShowRoleMenu(false); }}
+                        className={`w-full px-3 py-2 text-left flex items-center gap-2 text-xs font-semibold hover:bg-surface-container ${
+                          currentRole === r ? 'text-secondary bg-surface-container-low font-bold' : 'text-on-surface'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">{icons[r]}</span>
+                        {r === 'fisher' ? 'Fisherman (Mobile)' : ROLE_VERIFICATION[MARINE_TO_TIER[r]]?.label}
+                      </button>
+                    ))}
+                    {pendingRoles.length > 0 && (
+                      <div className="px-3 py-1.5 text-[10px] text-amber-700 font-semibold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px]">hourglass_top</span>
+                        {pendingRoles.length} role(s) awaiting admin approval
+                      </div>
+                    )}
                     <button
-                      key={r.id}
-                      onClick={() => {
-                        setCurrentRole(r.id);
-                        setShowRoleMenu(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left flex items-center gap-2 text-xs font-semibold hover:bg-surface-container ${
-                        currentRole === r.id ? 'text-secondary bg-surface-container-low font-bold' : 'text-on-surface'
-                      }`}
+                      onClick={() => { openAuth('researcher'); setShowRoleMenu(false); }}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2 text-xs font-semibold text-secondary hover:bg-surface-container border-t border-surface-container"
                     >
-                      <span className="material-symbols-outlined text-[16px]">{r.icon}</span>
-                      {r.label}
+                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                      Add another role
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <button
+                      onClick={() => { signOut(); setShowRoleMenu(false); }}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2 text-xs font-semibold text-error hover:bg-surface-container"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">logout</span>
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Profile Avatar */}
             <button

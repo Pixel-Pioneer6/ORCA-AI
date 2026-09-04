@@ -1,8 +1,10 @@
 import React from 'react';
 import { useMarine } from '../../context/MarineContext';
+import { getStaleness } from '../../lib/staleness';
 
 export default function TelemetryBento() {
-  const { telemetry } = useMarine();
+  const { telemetry, now } = useMarine();
+  const staleness = getStaleness(telemetry.retrievedAt, 'forecast', now);
 
   const metrics = [
     {
@@ -61,7 +63,7 @@ export default function TelemetryBento() {
 
           <div className="flex items-baseline gap-1 my-1">
             <span className="font-telemetry-lg text-telemetry-lg font-bold text-on-surface tracking-tight">
-              {m.value}
+              {staleness.isHardExpired ? '--' : m.value}
             </span>
             {m.unit && (
               <span className="font-label-md text-label-md text-on-surface-variant font-medium">
@@ -71,9 +73,11 @@ export default function TelemetryBento() {
           </div>
 
           <div className="flex items-center justify-between text-[11px] border-t border-surface-container-high/40 pt-1">
-            <span className="text-on-surface-variant truncate font-medium">{m.desc}</span>
-            <span className={`font-mono text-[10px] font-bold ${m.trendUp ? 'text-amber-600' : 'text-secondary'}`}>
-              {m.trend}
+            <span className="text-on-surface-variant truncate font-medium">
+              {staleness.isHardExpired ? 'UNRELIABLE (>12H)' : m.desc}
+            </span>
+            <span className={`font-mono text-[10px] font-bold ${staleness.isHardExpired ? 'text-error' : m.trendUp ? 'text-amber-600' : 'text-secondary'}`}>
+              {staleness.isHardExpired ? 'EXPIRED' : m.trend}
             </span>
           </div>
         </div>

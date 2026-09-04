@@ -79,3 +79,62 @@
   transform-origin: center;
   animation: radar-sweep 4s linear infinite;
 }
+
+/* Accessibility: text-size control from GovMasthead (§NFR-7) */
+html[data-text-scale='lg'] {
+  font-size: 112%;
+}
+html[data-text-scale='xl'] {
+  font-size: 128%;
+}
+
+/* Leaflet map controls (TacticalGisMap) — restyled to match the app's dark
+   translucent HUD chips instead of Leaflet's default white boxes with sharp
+   corners, which visually clashed with the map's rounded, dark-themed card
+   (most noticeable on the small embedded Home-page map, where the default
+   white attribution strip dominates a disproportionate share of the compact
+   180px-tall card). OSM's attribution requirement still needs a visible
+   credit — this keeps it, just styled to belong in this UI. */
+.leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.6) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.75) !important;
+  border-radius: 6px !important;
+  padding: 1px 6px !important;
+  font-size: 9px !important;
+  line-height: 1.5 !important;
+  margin: 0 4px 4px 0 !important;
+  box-shadow: none !important;
+}
+.leaflet-control-attribution a {
+  color: #7dd3fc !important;
+}
+.leaflet-bar {
+  border-radius: 8px !important;
+  overflow: hidden;
+  border: none !important;
+}
+.leaflet-bar a {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+.leaflet-bar a:hover {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+}
+.leaflet-container {
+  font-family: inherit;
+  border-radius: inherit;
+}
+
+/* Accessibility: high-glare / high-contrast solar filter (§DESIGN.md 4.2, NFR-7) */
+html.high-contrast {
+  filter: contrast(1.18) saturate(1.1);
+}
+html.high-contrast :is(button, a, input, [role='button']) {
+  outline-offset: 2px;
+}
+html.high-contrast :is(button, a[href], [role='button']):focus-visible {
+  outline: 3px solid #f59e0b;
+}

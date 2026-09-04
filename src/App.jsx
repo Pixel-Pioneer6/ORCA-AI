@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MarineProvider, useMarine } from './context/MarineContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { AuthProvider } from './context/AuthContext';
 
 // Common Components
 import GovMasthead from './components/common/GovMasthead';
@@ -11,6 +12,10 @@ import BottomNav from './components/common/BottomNav';
 import SidebarRail from './components/common/SidebarRail';
 import GovFooter from './components/common/GovFooter';
 import VoiceMicModal from './components/common/VoiceMicModal';
+import AuthModal from './components/common/AuthModal';
+import OfflineBanner from './components/common/OfflineBanner';
+import GeofenceAlertBanner from './components/common/GeofenceAlertBanner';
+import ScreenSwitcher from './components/common/ScreenSwitcher';
 
 // 11 Screen Pages
 import HomePage from './pages/01_Home';
@@ -25,49 +30,54 @@ import PortDashboard from './pages/09_PortDashboard';
 import ResearcherWorkspace from './pages/10_ResearcherWorkspace';
 import AuthorityDashboard from './pages/11_AuthorityDashboard';
 
-const SCREENS_LIST = [
-  { path: '/', role: 'fisher', label: '01 Home' },
-  { path: '/safety', role: 'fisher', label: '02 Safety' },
-  { path: '/pfz', role: 'fisher', label: '03 PFZ' },
-  { path: '/map', role: 'fisher', label: '04 Map' },
-  { path: '/assistant', role: 'fisher', label: '05 AI Voice' },
-  { path: '/profile', role: 'fisher', label: '06 Vessel' },
-  { path: '/settings', role: 'fisher', label: '07 Settings' },
-  { path: '/dashboard/ddmo', role: 'ddmo', label: '08 DDMO' },
-  { path: '/dashboard/port', role: 'port', label: '09 Port' },
-  { path: '/dashboard/researcher', role: 'researcher', label: '10 Research' },
-  { path: '/dashboard/authority', role: 'authority', label: '11 Command' },
-];
-
 function AppContent() {
-  const { currentRole, setCurrentRole } = useMarine();
-  const isDesktopRole = ['ddmo', 'port', 'researcher', 'authority'].includes(currentRole);
+  const { currentRole, setCurrentRole, viewModeOverride, setViewModeOverride } = useMarine();
+  const roleIsDesktop = ['ddmo', 'port', 'researcher', 'authority'].includes(currentRole);
+  // Dual screen mode: 'auto' keeps the existing role-driven choice; a forced
+  // override lets either shell be previewed regardless of role/window size.
+  const isDesktopRole = viewModeOverride === 'desktop' ? true : viewModeOverride === 'mobile' ? false : roleIsDesktop;
 
   return (
     <div className="min-h-screen bg-surface text-on-surface flex flex-col antialiased">
-      {/* Universal Floating Screen Switcher HUD for Quick Demo Evaluation */}
-      <div className="fixed top-2 right-2 z-50 hidden md:flex items-center gap-1 bg-black/80 backdrop-blur-md p-1.5 rounded-xl border border-white/20 shadow-2xl text-[11px]">
-        <span className="text-secondary-container font-bold uppercase font-mono px-2">
-          Stitch Screens:
-        </span>
-        <div className="flex items-center gap-1 overflow-x-auto max-w-xl">
-          {SCREENS_LIST.map((s) => (
-            <a
-              key={s.path}
-              href={`#${s.path}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setCurrentRole(s.role);
-                window.history.pushState({}, '', s.path);
-                window.dispatchEvent(new PopStateEvent('popstate'));
-              }}
-              className="px-2 py-1 rounded font-bold transition-all whitespace-nowrap text-white/70 hover:text-white hover:bg-white/10"
-            >
-              {s.label}
-            </a>
-          ))}
-        </div>
+      {/* Dual Screen Mode toggle — always visible (unlike the desktop-only
+          Stitch Screens HUD below) so it works from a phone too.
+          bottom-20 on narrow viewports clears BottomNav's edge-to-edge
+          80px bar (same convention OfflineBanner already uses); md:bottom-4
+          on wider viewports, where BottomNav's content is centered in a
+          max-w-lg column and never reaches the edges anyway. */}
+      <div className="fixed bottom-20 md:bottom-4 left-4 z-[70] flex items-center gap-0.5 bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/20 shadow-2xl">
+        <button
+          onClick={() => setViewModeOverride(viewModeOverride === 'desktop' ? 'auto' : 'desktop')}
+          title="Force desktop layout"
+          aria-pressed={viewModeOverride === 'desktop'}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+            viewModeOverride === 'desktop' ? 'bg-secondary text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
+        </button>
+        <button
+          onClick={() => setViewModeOverride(viewModeOverride === 'mobile' ? 'auto' : 'mobile')}
+          title="Force mobile layout"
+          aria-pressed={viewModeOverride === 'mobile'}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+            viewModeOverride === 'mobile' ? 'bg-secondary text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px]">smartphone</span>
+        </button>
+        {viewModeOverride !== 'auto' && (
+          <span className="text-[9px] font-mono font-bold text-secondary-container uppercase pr-2 pl-1">
+            {viewModeOverride}
+          </span>
+        )}
       </div>
+
+      {/* Demo screen navigator — a collapsed menu button (not a permanently
+          visible numbered strip) so it reads as a normal app affordance
+          rather than an exposed dev tool. Anchored bottom-right, clear of
+          the fixed GovMasthead/HeaderDesktop bars. */}
+      <ScreenSwitcher setCurrentRole={setCurrentRole} />
 
       {isDesktopRole ? (
         /* Desktop Layout (Screens 08, 09, 10, 11) */
@@ -84,7 +94,7 @@ function AppContent() {
                 <Route path="/dashboard/authority" element={<AuthorityDashboard />} />
                 <Route path="*" element={<DdmoDashboard />} />
               </Routes>
-              <GovFooter />
+              <GovFooter variant="desktop" />
             </main>
           </div>
         </div>
@@ -104,6 +114,7 @@ function AppContent() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<HomePage />} />
             </Routes>
+            <GovFooter variant="mobile" />
           </main>
           <BottomNav />
         </div>
@@ -111,6 +122,9 @@ function AppContent() {
 
       {/* Global Voice Assistant Modal */}
       <VoiceMicModal />
+      <AuthModal />
+      <OfflineBanner />
+      <GeofenceAlertBanner />
     </div>
   );
 }
@@ -119,9 +133,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <LanguageProvider>
-        <MarineProvider>
-          <AppContent />
-        </MarineProvider>
+        <AuthProvider>
+          <MarineProvider>
+            <AppContent />
+          </MarineProvider>
+        </AuthProvider>
       </LanguageProvider>
     </BrowserRouter>
   );

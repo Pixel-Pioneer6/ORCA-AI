@@ -8,12 +8,17 @@ class PortOperationsAgent:
 
     @classmethod
     def get_harbour_status(cls, port_id: str = "kasimedu") -> Dict[str, Any]:
+        # lat/lon are illustrative AIS positions (no live transponder feed —
+        # see PRD §15.3 "transponder integration", explicitly future scope)
+        # but placed at real, plausible points along Kasimedu's actual
+        # approach channel/anchorage, not arbitrary map coordinates — this
+        # is what the map's "Harbour Channel" mode plots (GisMapPage.jsx).
         vessels = [
-            {"name": "MV Ocean Star", "mmsi": "419001284", "vessel_type": "Mechanized Trawler (18m)", "draft_m": 2.1, "status": "Bar Hold", "status_level": "caution", "berth": "Outer Anchorage", "action_required": "Hold Clearance"},
-            {"name": "Sea Fisher IV", "mmsi": "419002931", "vessel_type": "Traditional FRP (9m)", "draft_m": 0.9, "status": "Caution Inbound", "status_level": "caution", "berth": "Jetty B-04", "action_required": "Escort Pilot"},
-            {"name": "Coromandel Pearl", "mmsi": "419003884", "vessel_type": "Gillnetter (14m)", "draft_m": 1.6, "status": "Cleared Exit", "status_level": "safe", "berth": "Channel Out", "action_required": "VHF-16 Log"},
-            {"name": "Harbour Tug 02", "mmsi": "419004112", "vessel_type": "Port Assist Tug", "draft_m": 2.8, "status": "Stationary Watch", "status_level": "safe", "berth": "Pier 1 Standby", "action_required": "Direct Dispatch"},
-            {"name": "Blue Fin 08", "mmsi": "419005009", "vessel_type": "Longliner (16m)", "draft_m": 1.8, "status": "Shoal Risk", "status_level": "danger", "berth": "Approach Bar", "action_required": "Immediate Alert"},
+            {"name": "MV Ocean Star", "mmsi": "419001284", "vessel_type": "Mechanized Trawler (18m)", "draft_m": 2.1, "status": "Bar Hold", "status_level": "caution", "berth": "Outer Anchorage", "action_required": "Hold Clearance", "lat": 13.108, "lon": 80.312},
+            {"name": "Sea Fisher IV", "mmsi": "419002931", "vessel_type": "Traditional FRP (9m)", "draft_m": 0.9, "status": "Caution Inbound", "status_level": "caution", "berth": "Jetty B-04", "action_required": "Escort Pilot", "lat": 13.115, "lon": 80.304},
+            {"name": "Coromandel Pearl", "mmsi": "419003884", "vessel_type": "Gillnetter (14m)", "draft_m": 1.6, "status": "Cleared Exit", "status_level": "safe", "berth": "Channel Out", "action_required": "VHF-16 Log", "lat": 13.122, "lon": 80.297},
+            {"name": "Harbour Tug 02", "mmsi": "419004112", "vessel_type": "Port Assist Tug", "draft_m": 2.8, "status": "Stationary Watch", "status_level": "safe", "berth": "Pier 1 Standby", "action_required": "Direct Dispatch", "lat": 13.119, "lon": 80.300},
+            {"name": "Blue Fin 08", "mmsi": "419005009", "vessel_type": "Longliner (16m)", "draft_m": 1.8, "status": "Shoal Risk", "status_level": "danger", "berth": "Approach Bar", "action_required": "Immediate Alert", "lat": 13.111, "lon": 80.307},
         ]
 
         return {

@@ -25,3 +25,21 @@ dist-ssr
 
 # Temporary scratch
 scratch/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Runtime SQLite databases (auth, audit, spatial, directives) — generated
+# state, not source; contains local test fixtures/session tokens only.
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Environment secrets
+.env
+.env.*
+!.env.example

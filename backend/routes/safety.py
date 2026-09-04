@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Query
+import asyncio
+from typing import Optional
+from fastapi import APIRouter, Query, Header
 from ..models.schemas import SafetyVerdictResponse, TelemetrySnapshot
 from ..agents.safety_agent import SafetyAgent
+from ..lib import auth_store, audit_log
 
 router = APIRouter(prefix="/safety", tags=["Marine Safety"])
 
@@ -8,13 +11,39 @@ router = APIRouter(prefix="/safety", tags=["Marine Safety"])
 async def get_safety_verdict(
     loa: float = Query(8.2, description="Craft LOA in meters"),
     hp: float = Query(9.9, description="Engine HP"),
-    time: str = Query("tomorrow 05:00", description="Target departure time")
+    time: str = Query("tomorrow 05:00", description="Target departure time"),
+    authorization: Optional[str] = Header(None),
 ):
     """
     Evaluates ocean wave SWH, wind squalls, and bar shoaling to generate
     deterministic safety verdicts ('SAFE', 'CAUTION', 'DO NOT VENTURE', 'STALE').
     """
-    res = SafetyAgent.evaluate_departure_safety(loa=loa, hp=hp, target_time=time)
+    # NFR-1/2/6: SafetyAgent's live-connector fetch and the SQLite audit
+    # write are both genuinely blocking I/O (network request, disk write).
+    # Running them inline in the async handler blocks the single event loop
+    # for their entire duration, serializing concurrent requests — a real
+    # bottleneck a load test (backend/scripts/load_test.py) actually
+    # measured (p95 latency scaling badly with concurrency). Moving them to
+    # a worker thread lets the event loop keep serving other requests
+    # while this one waits on I/O.
+    res = await asyncio.to_thread(SafetyAgent.evaluate_departure_safety, loa, hp, time)
+
+    user_id, identity_value = None, None
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        user_id = await asyncio.to_thread(auth_store.resolve_session, token)
+        if user_id:
+            user = await asyncio.to_thread(auth_store.get_user, user_id)
+            identity_value = user["identity_value"] if user else None
+    await asyncio.to_thread(
+        audit_log.log_query,
+        endpoint="/api/safety/verdict",
+        query_text=f"loa={loa} hp={hp} time={time}",
+        user_id=user_id,
+        identity_value=identity_value,
+        verdict=res["verdict"],
+        confidence=res["confidence"],
+    )
     buoy = res["telemetry"]
     guard = res["guardrail"]
 
@@ -27,6 +56,7 @@ async def get_safety_verdict(
         current_velocity=buoy["surface_current"],
         sst=buoy["sst"],
         timestamp=buoy["timestamp"],
+        data_source=buoy.get("data_source"),
     )
 
     state_map = {
@@ -54,4 +84,5 @@ async def get_safety_verdict(
         craft_max_wind=guard["craft_max_wind"],
         sources=res["sources"],
         hourly_forecast=res["hourly_forecast"],
+        source_tier=guard.get("source_tier"),
     )

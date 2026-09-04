@@ -1,6 +1,7 @@
-from fastapi import APIRouter
-from ..models.schemas import DdmoResponse, DdmoMetrics, IncidentLogItem, SmsBroadcastRequest, SmsBroadcastResponse
+from fastapi import APIRouter, Depends
+from ..models.schemas import DdmoResponse, DdmoMetrics, IncidentLogItem, CoastalBlockExposure, SmsBroadcastRequest, SmsBroadcastResponse
 from ..agents.disaster_agent import DisasterAgent
+from ..lib.auth_dependencies import require_verified_role
 
 router = APIRouter(prefix="/ddmo", tags=["Disaster Management (DDMO)"])
 
@@ -13,6 +14,7 @@ async def get_ddmo_status():
     data = DisasterAgent.get_ddmo_status()
     metrics = DdmoMetrics(**data["metrics"])
     incidents = [IncidentLogItem(**inc) for inc in data["incidents"]]
+    coastal_blocks = [CoastalBlockExposure(**b) for b in data["coastal_blocks"]]
 
     return DdmoResponse(
         district=data["district"],
@@ -21,13 +23,18 @@ async def get_ddmo_status():
         valid_until=data["valid_until"],
         metrics=metrics,
         incidents=incidents,
+        coastal_blocks=coastal_blocks,
     )
 
 @router.post("/sms-broadcast", response_model=SmsBroadcastResponse)
-async def issue_sms_broadcast(req: SmsBroadcastRequest):
+async def issue_sms_broadcast(req: SmsBroadcastRequest, _user_id: str = Depends(require_verified_role("ddmo"))):
     """
     Dispatches compact 2G SMS alerts (<160 chars) in Tamil and English
     to registered skippers and coastal hamlets via NavIC & GSM broadcast.
+
+    NFR-9: requires a verified DDMO session server-side (not just a
+    disabled button in the UI) — an unauthenticated or wrong-role caller
+    gets a real 401/403, not a dispatched broadcast.
     """
     res = DisasterAgent.generate_emergency_broadcast(verdict="CAUTION", swh=1.8, wind=24.0)
     sms = res["sms_payload"]
@@ -42,8 +49,8 @@ async def issue_sms_broadcast(req: SmsBroadcastRequest):
     )
 
 @router.post("/trigger-siren")
-async def trigger_harbour_siren():
-    """Triggers port emergency audio siren chime sequence."""
+async def trigger_harbour_siren(_user_id: str = Depends(require_verified_role("ddmo"))):
+    """Triggers port emergency audio siren chime sequence. NFR-9-gated (see sms-broadcast)."""
     return {
         "status": "SIREN_ACTIVATED",
         "zone": "Kasimedu Pier & Ennore Bight",

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from ..services.satellite_service import SatelliteService
+from ..agents.analytics_agent import AnalyticsAgent
 
 router = APIRouter(prefix="/researcher", tags=["Marine Climatology & Analytics"])
 
@@ -8,24 +9,35 @@ async def get_climatology_metrics():
     """
     Returns 30-day SST climatological trajectory vs 30-year normal,
     upwelling thermal anomalies, and satellite model concordance.
+
+    FR-3.4 — the summary's anomaly/trend/R² figures are now the real
+    output of AnalyticsAgent's numpy computation over this same series,
+    not independently hand-picked constants that happened to look similar.
     """
     data = SatelliteService.get_climatology_trajectory()
-    
-    # 30-day simulation series
-    timeseries = []
+
     base_sst = 28.6
-    for day in range(1, 31):
-        anomaly = 0.8 * (day / 30.0) if day > 20 else 0.2
+    observed = [round(base_sst + (0.8 * (day / 30.0) if day > 20 else 0.2), 2) for day in range(1, 31)]
+    analysis = AnalyticsAgent.compute_anomaly_series(observed, climatological_mean=base_sst)
+
+    timeseries = []
+    for point in analysis["series"]:
+        day = point["index"] + 1
         timeseries.append({
             "day": day,
-            "observed_sst": round(base_sst + anomaly, 2),
+            "observed_sst": point["value"],
             "normal_mean": base_sst,
+            "z_score": point["z_score"],
             "chlorophyll_proxy": round(0.5 + (0.02 * day), 2),
         })
+
+    data["thermal_anomaly"] = analysis["mean_anomaly"]
+    data["r_squared"] = analysis["trend_r_squared"]
 
     return {
         "summary": data,
         "timeseries": timeseries,
+        "analysis": analysis,
     }
 
 @router.get("/sensors")

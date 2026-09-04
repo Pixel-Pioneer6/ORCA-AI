@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from ..models.schemas import PortStatusResponse, AisVesselItem
 from ..agents.port_agent import PortOperationsAgent
+from ..lib.auth_dependencies import require_verified_role
 
 router = APIRouter(prefix="/port", tags=["Port Operations"])
 
@@ -28,8 +29,11 @@ async def get_port_status():
     )
 
 @router.post("/vhf-broadcast")
-async def broadcast_vhf_alert():
-    """Simulates broadcasting official port warning over marine VHF Channel 16."""
+async def broadcast_vhf_alert(_user_id: str = Depends(require_verified_role("port"))):
+    """
+    Simulates broadcasting official port warning over marine VHF Channel 16.
+    NFR-9: requires a verified Port Operator session server-side.
+    """
     script = PortOperationsAgent.generate_vhf_broadcast_script()
     return {
         "status": "TRANSMITTED",

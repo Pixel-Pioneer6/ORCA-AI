@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 const translations = {
   en: {
@@ -30,6 +30,49 @@ const translations = {
     onlineStatus: 'ONLINE · 4G',
     activeAlerts: 'Active Alerts',
     jointAdvisory: 'Joint Advisory · INCOIS / IMD',
+    disclaimer: 'Advisory only — not a substitute for official IMD / INCOIS warnings. Always follow local port authority instructions.',
+    // Home
+    'home.liveMap': 'Live Tactical Marine Map',
+    'home.expandMap': 'Expand Full Map',
+    'home.nearestRoute': 'Nearest Safe Route to PFZ #01',
+    'home.telemetryHeading': 'Physical Sea Telemetry (INCOIS Buoy BD08)',
+    'home.nearestPfz': 'Nearest Potential Fishing Zone (PFZ)',
+    'home.highProbability': 'HIGH TUNA / SARDINE PROBABILITY',
+    'home.transitCaution': 'Caution on nearshore bar transit',
+    'home.voyagePlan': 'Voyage Plan',
+    'home.provenanceHeading': 'Government Agency Provenance & Confidence',
+    // Safety
+    'safety.backToHome': 'Back to Home',
+    'safety.targetCraft': 'Target Craft',
+    'safety.simHeading': 'Deterministic Safety Simulation',
+    'safety.simSub': 'Sets raw sensor inputs — verdict below is always derived',
+    'safety.riskFactorsHeading': 'Primary Physical Risk Factors vs. Craft Thresholds',
+    'safety.waveFactor': 'Significant Wave Height (SWH)',
+    'safety.windFactor': 'Squall Gust Envelope',
+    'safety.consensusHeading': 'Institutional Sensor Consensus & Ingest Latency',
+    'safety.tapToInspect': 'Tap any source to inspect its evidence record',
+    'safety.reasoningHeading': 'How ORCA Reached this Result',
+    'safety.findWindow': 'Find Safe Window',
+    'safety.notifyCrew': 'Notify Crew',
+    // PFZ
+    'pfz.backToHome': 'Back to Home',
+    'pfz.liveIngest': 'Oceansat-3 Ingest Live',
+    'pfz.chlFront': 'Chlorophyll-a Front',
+    'pfz.sstBoundary': 'SST Thermal Boundary',
+    'pfz.speciesConcentration': 'Species Concentration',
+    'pfz.fuelSavings': 'Fuel Savings',
+    'pfz.transitHeading': 'Corridor Transit Safety Assessment',
+    'pfz.transitCautionBadge': 'Caution on Transit',
+    'pfz.recommendedDeparture': 'Recommended Departure',
+    'pfz.plotSafeRoute': 'Plot Safe Route',
+    'pfz.alternativesHeading': 'Ranked Nearby Potential Fishing Zones',
+    'pfz.scientificBasisHeading': 'Why is this a PFZ? (Scientific Oceanographic Basis)',
+    'pfz.voiceHook': 'Is there a calmer route to PFZ #01?',
+    // Assistant
+    'assistant.title': 'ORCA Conversational Assistant',
+    'assistant.subtitle': 'Tamil · English · Hindi Voice Engine',
+    'assistant.placeholder': 'Type your question in Tamil or English...',
+    'assistant.voice': 'Voice',
   },
   ta: {
     appName: 'ஆர்கா கடல்சார்',
@@ -60,6 +103,45 @@ const translations = {
     onlineStatus: 'ஆன்லைன் · 4G',
     activeAlerts: 'நேரலை எச்சரிக்கைகள்',
     jointAdvisory: 'கூட்டு ஆலோசனை · INCOIS / IMD',
+    disclaimer: 'இது ஒரு ஆலோசனை மட்டுமே — இது INCOIS / IMD அதிகாரப்பூர்வ எச்சரிக்கைகளுக்கு மாற்றாக பயன்படுத்த வேண்டாம். எப்போதும் உள்ளூர் துறைமுக அதிகாரிகளின் வழிமுறைகளை பின்பற்றவும்.',
+    'home.liveMap': 'நேரலை கடல் வரைபடம்',
+    'home.expandMap': 'முழு வரைபடத்தைத் திற',
+    'home.nearestRoute': 'PFZ #01-க்கு அருகிலுள்ள பாதுகாப்பான பாதை',
+    'home.telemetryHeading': 'கடல் நிலவரம் (INCOIS புவாய் BD08)',
+    'home.nearestPfz': 'அருகிலுள்ள மீன்பிடி மண்டலம் (PFZ)',
+    'home.highProbability': 'அதிக சூரை / மத்தி வாய்ப்பு',
+    'home.transitCaution': 'கரையோர மணல் திட்டு கடக்கும்போது எச்சரிக்கை',
+    'home.voyagePlan': 'பயண திட்டம்',
+    'home.provenanceHeading': 'அரசு நிறுவன தரவு ஆதாரம் & நம்பகத்தன்மை',
+    'safety.backToHome': 'முகப்புக்குத் திரும்பு',
+    'safety.targetCraft': 'இலக்கு படகு',
+    'safety.simHeading': 'நிர்ணயவாத பாதுகாப்பு உருவகப்படுத்துதல்',
+    'safety.simSub': 'மூல சென்சார் தரவை அமைக்கிறது — கீழே உள்ள முடிவு எப்போதும் கணக்கிடப்படுகிறது',
+    'safety.riskFactorsHeading': 'படகின் வரம்புகளுக்கு எதிரான முதன்மை ஆபத்து காரணிகள்',
+    'safety.waveFactor': 'குறிப்பிடத்தக்க அலை உயரம்',
+    'safety.windFactor': 'சூறாவளி காற்று வரம்பு',
+    'safety.consensusHeading': 'நிறுவன சென்சார் ஒருமித்த கருத்து & தாமதம்',
+    'safety.tapToInspect': 'ஆதாரத்தை பார்வையிட எந்த மூலத்தையும் தட்டவும்',
+    'safety.reasoningHeading': 'ஆர்கா இந்த முடிவை எப்படி அடைந்தது',
+    'safety.findWindow': 'பாதுகாப்பான நேரத்தைக் கண்டறி',
+    'safety.notifyCrew': 'குழுவினருக்கு தெரிவி',
+    'pfz.backToHome': 'முகப்புக்குத் திரும்பு',
+    'pfz.liveIngest': 'Oceansat-3 நேரலை தரவு',
+    'pfz.chlFront': 'குளோரோஃபில்-a அளவு',
+    'pfz.sstBoundary': 'கடல் வெப்பநிலை எல்லை',
+    'pfz.speciesConcentration': 'மீன் வகை செறிவு',
+    'pfz.fuelSavings': 'எரிபொருள் சேமிப்பு',
+    'pfz.transitHeading': 'பாதை கடக்கும் பாதுகாப்பு மதிப்பீடு',
+    'pfz.transitCautionBadge': 'கடக்கும்போது எச்சரிக்கை',
+    'pfz.recommendedDeparture': 'பரிந்துரைக்கப்பட்ட புறப்பாடு',
+    'pfz.plotSafeRoute': 'பாதுகாப்பான வழி',
+    'pfz.alternativesHeading': 'அருகிலுள்ள மீன்பிடி மண்டலங்கள்',
+    'pfz.scientificBasisHeading': 'இது ஏன் PFZ? (அறிவியல் அடிப்படை)',
+    'pfz.voiceHook': 'PFZ #01-க்கு அமைதியான பாதை உள்ளதா?',
+    'assistant.title': 'ஆர்கா உரையாடல் உதவியாளர்',
+    'assistant.subtitle': 'தமிழ் · ஆங்கிலம் · இந்தி குரல் இயந்திரம்',
+    'assistant.placeholder': 'தமிழில் அல்லது ஆங்கிலத்தில் உங்கள் கேள்வியை தட்டச்சு செய்யவும்...',
+    'assistant.voice': 'குரல்',
   },
   hi: {
     appName: 'ओरका समुद्री',
@@ -90,13 +172,81 @@ const translations = {
     onlineStatus: 'ऑनलाइन · 4G',
     activeAlerts: 'सक्रिय अलर्ट',
     jointAdvisory: 'संयुक्त परामर्श · INCOIS / IMD',
+    disclaimer: 'यह केवल एक सलाह है — यह IMD / INCOIS की आधिकारिक चेतावनियों का विकल्प नहीं है। हमेशा स्थानीय बंदरगाह प्राधिकरण के निर्देशों का पालन करें।',
+    'home.liveMap': 'लाइव सामरिक समुद्री मानचित्र',
+    'home.expandMap': 'पूरा मानचित्र खोलें',
+    'home.nearestRoute': 'PFZ #01 का निकटतम सुरक्षित मार्ग',
+    'home.telemetryHeading': 'समुद्री टेलीमेट्री (INCOIS बॉय BD08)',
+    'home.nearestPfz': 'निकटतम संभावित मछली पकड़ने का क्षेत्र (PFZ)',
+    'home.highProbability': 'उच्च टूना / सार्डिन संभावना',
+    'home.transitCaution': 'तटवर्ती बालू पट्टी पार करते समय सावधानी',
+    'home.voyagePlan': 'यात्रा योजना',
+    'home.provenanceHeading': 'सरकारी एजेंसी स्रोत और विश्वसनीयता',
+    'safety.backToHome': 'होम पर वापस जाएं',
+    'safety.targetCraft': 'लक्षित नाव',
+    'safety.simHeading': 'नियतात्मक सुरक्षा सिमुलेशन',
+    'safety.simSub': 'कच्चे सेंसर इनपुट सेट करता है — नीचे दिया गया निर्णय हमेशा गणना किया जाता है',
+    'safety.riskFactorsHeading': 'नाव की सीमाओं के मुकाबले प्रमुख जोखिम कारक',
+    'safety.waveFactor': 'सार्थक लहर ऊंचाई',
+    'safety.windFactor': 'तूफानी हवा सीमा',
+    'safety.consensusHeading': 'संस्थागत सेंसर सहमति और विलंब',
+    'safety.tapToInspect': 'साक्ष्य रिकॉर्ड देखने के लिए किसी भी स्रोत पर टैप करें',
+    'safety.reasoningHeading': 'ओरका इस निष्कर्ष पर कैसे पहुंचा',
+    'safety.findWindow': 'सुरक्षित समय खोजें',
+    'safety.notifyCrew': 'चालक दल को सूचित करें',
+    'pfz.backToHome': 'होम पर वापस जाएं',
+    'pfz.liveIngest': 'Oceansat-3 लाइव डेटा',
+    'pfz.chlFront': 'क्लोरोफिल-a सांद्रता',
+    'pfz.sstBoundary': 'समुद्र सतह तापमान सीमा',
+    'pfz.speciesConcentration': 'प्रजाति सघनता',
+    'pfz.fuelSavings': 'ईंधन बचत',
+    'pfz.transitHeading': 'मार्ग पार करने की सुरक्षा जांच',
+    'pfz.transitCautionBadge': 'पार करते समय सावधानी',
+    'pfz.recommendedDeparture': 'अनुशंसित प्रस्थान',
+    'pfz.plotSafeRoute': 'सुरक्षित मार्ग बनाएं',
+    'pfz.alternativesHeading': 'निकटवर्ती संभावित मछली पकड़ने के क्षेत्र',
+    'pfz.scientificBasisHeading': 'यह PFZ क्यों है? (वैज्ञानिक आधार)',
+    'pfz.voiceHook': 'क्या PFZ #01 का कोई शांत मार्ग है?',
+    'assistant.title': 'ओरका वार्तालाप सहायक',
+    'assistant.subtitle': 'तमिल · अंग्रेज़ी · हिंदी वॉइस इंजन',
+    'assistant.placeholder': 'तमिल या अंग्रेज़ी में अपना प्रश्न टाइप करें...',
+    'assistant.voice': 'आवाज़',
+  },
+  // Malayalam — the second coastal voice language (FR-1.1/FR-1.5), covering
+  // the assistant/voice-facing strings that matter for that flow. Any key
+  // not listed here falls back to English via t()'s existing fallback —
+  // an honest partial, not a silently broken lookup.
+  ml: {
+    appName: 'ഓർക്ക മറൈൻ',
+    safe: 'സുരക്ഷിതം',
+    caution: 'ജാഗ്രത',
+    doNotVenture: 'കടലിൽ പോകരുത്',
+    stale: 'പഴയ വിവരം',
+    voicePrompt: 'മലയാളത്തിലോ ഇംഗ്ലീഷിലോ ഓർക്കയോട് ചോദിക്കുക',
+    speakNow: 'ഇപ്പോൾ സംസാരിക്കുക...',
+    disclaimer: 'ഉപദേശപരം മാത്രം — ഔദ്യോഗിക IMD / INCOIS മുന്നറിയിപ്പുകൾക്ക് പകരമല്ല. തുറമുഖ അധികാരികളുടെ നിർദ്ദേശങ്ങൾ എപ്പോഴും പാലിക്കുക.',
+    'assistant.title': 'ഓർക്ക സംഭാഷണ സഹായി',
+    'assistant.subtitle': 'മലയാളം · തമിഴ് · ഇംഗ്ലീഷ് · ഹിന്ദി വോയ്സ് എഞ്ചിൻ',
+    'assistant.placeholder': 'മലയാളത്തിലോ ഇംഗ്ലീഷിലോ നിങ്ങളുടെ ചോദ്യം ടൈപ്പ് ചെയ്യുക...',
+    'assistant.voice': 'ശബ്ദം',
   },
 };
 
 const LanguageContext = createContext();
 
+const LANGUAGE_STORAGE_KEY = 'orca_language';
+
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState('en');
+  // Real persistence — previously the language reset to English on every
+  // page reload, regardless of what the user had selected.
+  const [language, setLanguageState] = useState(() => {
+    try { return localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'en'; } catch { return 'en'; }
+  });
+
+  const setLanguage = (lang) => {
+    setLanguageState(lang);
+    try { localStorage.setItem(LANGUAGE_STORAGE_KEY, lang); } catch { /* private mode etc. — just won't persist */ }
+  };
 
   const t = (key) => {
     return translations[language]?.[key] || translations['en']?.[key] || key;

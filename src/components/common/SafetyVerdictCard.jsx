@@ -3,6 +3,7 @@ import { useMarine } from '../../context/MarineContext';
 import { useLanguage } from '../../context/LanguageContext';
 import DisclaimerStrip from './DisclaimerStrip';
 import { getStaleness } from '../../lib/staleness';
+import { speakText } from '../../services/speech';
 
 export default function SafetyVerdictCard({ onDetailClick }) {
   const { safety, telemetry, vesselSpecs, now } = useMarine();
@@ -85,75 +86,102 @@ export default function SafetyVerdictCard({ onDetailClick }) {
               Departure Feasibility
             </span>
           </div>
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/70 shadow-xs text-on-surface">
-            <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>
-            <span className="font-label-sm text-label-sm">Updated 2h ago</span>
+          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full shadow-xs ${staleness.badgeState === 'expired' ? 'bg-error text-white' : staleness.badgeState === 'amber' ? 'bg-amber-200 text-amber-950' : 'bg-white/70 text-on-surface'}`}>
+            {staleness.badgeState === 'fresh' && <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>}
+            {staleness.badgeState !== 'fresh' && <span className="material-symbols-outlined text-[13px]">sync_problem</span>}
+            <span className="font-label-sm text-label-sm">Updated {staleness.ageLabel}</span>
           </div>
         </div>
 
-        {/* Verdict Top Row */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${cfg.badgeBg} shadow-sm flex-shrink-0`}>
-              <span className="material-symbols-outlined text-[30px]">{cfg.icon}</span>
-            </div>
+        {staleness.isHardExpired ? (
+          /* §12.6 — an expired safety number is more dangerous than no number: hide it, don't grey it. */
+          <div className="flex items-center gap-2.5 p-3 rounded-lg bg-white/90 border border-black/5">
+            <span className="material-symbols-outlined text-[28px] text-outline">sync_problem</span>
             <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="font-display-lg-mobile text-display-lg-mobile font-bold tracking-tight leading-none">
-                  {cfg.title}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full font-label-md text-label-md font-bold ${cfg.pillBg}`}>
-                  {cfg.tamilTitle}
-                </span>
+              <span className="font-headline-sm text-sm font-bold text-on-surface">Cannot confirm conditions</span>
+              <span className="text-xs text-on-surface-variant">Do not rely on this. Telemetry last synced {staleness.ageLabel} — check official INCOIS/IMD channels.</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Verdict Top Row */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${cfg.badgeBg} shadow-sm flex-shrink-0`}>
+                  <span className="material-symbols-outlined text-[30px]">{cfg.icon}</span>
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display-lg-mobile text-display-lg-mobile font-bold tracking-tight leading-none">
+                      {cfg.title}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full font-label-md text-label-md font-bold ${cfg.pillBg}`}>
+                      {cfg.tamilTitle}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const speechText = `${cfg.title}. ${cfg.tamilTitle}. ${telemetry.advisory}`;
+                        speakText(speechText, 'ta');
+                      }}
+                      className="p-1.5 rounded-full bg-white/80 hover:bg-white text-secondary shadow-xs transition-transform active:scale-90"
+                      title="Listen Spoken Verdict in Tamil / English (PRD US-01)"
+                      aria-label="Listen spoken verdict"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">volume_up</span>
+                    </button>
+                  </div>
+                  <span className="font-label-md text-label-md font-medium opacity-80 mt-1">
+                    {t('confidence')}: {telemetry.confidence} · {cfg.subStatus}
+                  </span>
+                </div>
               </div>
-              <span className="font-label-md text-label-md font-medium opacity-80 mt-1">
-                {t('confidence')}: {telemetry.confidence} · {cfg.subStatus}
+            </div>
+
+            {/* Temporal Window Badge */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/90 shadow-xs self-start">
+              <span className="material-symbols-outlined text-[16px] text-secondary">timer</span>
+              <span className="font-label-md text-label-md font-bold text-on-surface">
+                Target Window: Tomorrow 05:00 – 10:00 IST (5 Hours)
               </span>
             </div>
-          </div>
-        </div>
 
-        {/* Temporal Window Badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/90 shadow-xs self-start">
-          <span className="material-symbols-outlined text-[16px] text-secondary">timer</span>
-          <span className="font-label-md text-label-md font-bold text-on-surface">
-            Target Window: Tomorrow 05:00 – 10:00 IST (5 Hours)
-          </span>
-        </div>
-
-        {/* Plain-Language Advisory */}
-        <div className="p-3 rounded-lg bg-white/90 text-on-surface shadow-xs border border-black/5">
-          <p className="font-body-md text-body-md leading-relaxed">
-            {telemetry.advisory}
-          </p>
-        </div>
-
-        {/* 2-Col Immediate Telemetry Summary */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${cfg.telemetryCardBg}`}>
-            <span className="material-symbols-outlined text-[20px] text-secondary">waves</span>
-            <div className="flex flex-col">
-              <span className={`font-label-sm text-label-sm uppercase tracking-wider font-semibold ${cfg.telemetryText}`}>
-                {t('maxWave')}
-              </span>
-              <span className={`font-telemetry-sm text-telemetry-sm font-bold ${cfg.telemetryValText}`}>
-                {telemetry.wave}{telemetry.waveUnit} · {telemetry.waveDesc}
-              </span>
+            {/* Plain-Language Advisory */}
+            <div className="p-3 rounded-lg bg-white/90 text-on-surface shadow-xs border border-black/5">
+              <p className="font-body-md text-body-md leading-relaxed">
+                {telemetry.advisory}
+              </p>
             </div>
-          </div>
 
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${cfg.telemetryCardBg}`}>
-            <span className="material-symbols-outlined text-[20px] text-secondary">air</span>
-            <div className="flex flex-col">
-              <span className={`font-label-sm text-label-sm uppercase tracking-wider font-semibold ${cfg.telemetryText}`}>
-                {t('windGusts')}
-              </span>
-              <span className={`font-telemetry-sm text-telemetry-sm font-bold ${cfg.telemetryValText}`}>
-                {telemetry.wind} {telemetry.windUnit} · {telemetry.windDesc}
-              </span>
+            {/* 2-Col Immediate Telemetry Summary */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${cfg.telemetryCardBg}`}>
+                <span className="material-symbols-outlined text-[20px] text-secondary">waves</span>
+                <div className="flex flex-col">
+                  <span className={`font-label-sm text-label-sm uppercase tracking-wider font-semibold ${cfg.telemetryText}`}>
+                    {t('maxWave')}
+                  </span>
+                  <span className={`font-telemetry-sm text-telemetry-sm font-bold ${cfg.telemetryValText}`}>
+                    {telemetry.wave}{telemetry.waveUnit} · {telemetry.waveDesc}
+                  </span>
+                </div>
+              </div>
+
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${cfg.telemetryCardBg}`}>
+                <span className="material-symbols-outlined text-[20px] text-secondary">air</span>
+                <div className="flex flex-col">
+                  <span className={`font-label-sm text-label-sm uppercase tracking-wider font-semibold ${cfg.telemetryText}`}>
+                    {t('windGusts')}
+                  </span>
+                  <span className={`font-telemetry-sm text-telemetry-sm font-bold ${cfg.telemetryValText}`}>
+                    {telemetry.wind} {telemetry.windUnit} · {telemetry.windDesc}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
+
+        <DisclaimerStrip className="pt-1 border-t border-black/5" />
       </div>
     </section>
   );

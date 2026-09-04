@@ -1,18 +1,80 @@
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
 import TacticalGisMap from '../components/maps/TacticalGisMap';
 import SwellWindCurve from '../components/charts/SwellWindCurve';
 import VesselTrafficTable from '../components/tables/VesselTrafficTable';
 import EvidenceChip from '../components/common/EvidenceChip';
+import { useAuth } from '../context/AuthContext';
+import { broadcastPortVhf } from '../services/api';
 
 export default function PortDashboard() {
+  const { heldRoles, openAuth } = useAuth();
+  const isVerifiedPort = heldRoles.includes('port');
   const [vhfAlertSent, setVhfAlertSent] = useState(false);
+  const [vhfError, setVhfError] = useState('');
+  const [generatingBrief, setGeneratingBrief] = useState(false);
+
+  // Real PDF generation from live data — previously alert('...PDF
+  // generated.') with no file ever produced.
+  const downloadSituationBrief = async () => {
+    setGeneratingBrief(true);
+    try {
+      const res = await fetch('/api/port/status');
+      const data = await res.json();
+      const doc = new jsPDF();
+      let y = 18;
+      doc.setFontSize(14);
+      doc.text('ORCA Port Situation Brief', 14, y);
+      y += 8;
+      doc.setFontSize(9);
+      doc.text(`Generated: ${new Date().toISOString()}`, 14, y);
+      y += 10;
+      doc.setFontSize(11);
+      doc.text(`${data.port_name}`, 14, y); y += 6;
+      doc.text(`Status: ${data.status_verdict}`, 14, y); y += 6;
+      doc.text(`Tide phase: ${data.tide_phase}`, 14, y); y += 6;
+      doc.text(`Depth over bar: ${data.current_depth_datum}m  ·  Next high tide: ${data.next_high_tide}`, 14, y); y += 6;
+      doc.text(`Visibility: ${data.visibility_nm} NM  ·  VHF: ${data.direct_vhf_channel}`, 14, y); y += 10;
+
+      doc.setFontSize(12);
+      doc.text('Vessels in perimeter', 14, y); y += 7;
+      doc.setFontSize(9);
+      data.vessels.forEach((v) => {
+        doc.text(`${v.name} (${v.mmsi}) — ${v.vessel_type} — ${v.status} @ ${v.berth}`, 14, y);
+        y += 5.5;
+      });
+      y += 4;
+      doc.setFontSize(12);
+      doc.text('Directives', 14, y); y += 7;
+      doc.setFontSize(9);
+      data.warnings.forEach((w) => {
+        const lines = doc.splitTextToSize(`• ${w}`, 180);
+        doc.text(lines, 14, y);
+        y += 5.5 * lines.length;
+      });
+
+      doc.save(`orca_port_situation_brief_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch {
+      setVhfError('Could not generate the brief — backend unreachable.');
+      setTimeout(() => setVhfError(''), 4000);
+    } finally {
+      setGeneratingBrief(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-pad-lg pb-16">
+      {vhfError && (
+        <div className="p-3 rounded-lg bg-error-container text-on-error-container border border-error/30 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+          <span className="material-symbols-outlined text-[18px]">block</span>
+          <span>Broadcast rejected by server: {vhfError}</span>
+        </div>
+      )}
+
       {/* 1. TOP BANNER: OPERATIONAL STATE & HIGH-DENSITY PORT SUMMARY DECK */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-pad-md">
+      <section id="port" className="scroll-mt-28 grid grid-cols-1 lg:grid-cols-12 gap-pad-md">
         {/* Port Status Verdict Card (5 cols) */}
-        <div className="lg:col-span-5 bg-surface-container-lowest p-pad-md rounded-xl border border-amber-300 shadow-md flex flex-col justify-between relative overflow-hidden">
+        <div id="conditions" className="scroll-mt-28 lg:col-span-5 bg-surface-container-lowest p-pad-md rounded-xl border border-amber-300 shadow-md flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between gap-pad-sm mb-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-highest">
               <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping"></span>
@@ -46,21 +108,31 @@ export default function PortDashboard() {
 
           <div className="flex items-center gap-2 pt-2 border-t border-surface-container mt-2">
             <button
-              onClick={() => {
+              onClick={async () => {
+                if (!isVerifiedPort) return openAuth('port');
+                // NFR-9: a real, server-role-gated call — the backend
+                // independently verifies the Port session itself.
+                const res = await broadcastPortVhf();
+                if (res?.error) {
+                  setVhfError(res.detail || `Broadcast rejected (HTTP ${res.status})`);
+                  setTimeout(() => setVhfError(''), 4000);
+                  return;
+                }
                 setVhfAlertSent(true);
                 setTimeout(() => setVhfAlertSent(false), 3000);
               }}
               className="flex-grow py-2 px-3 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary/90 transition-colors"
             >
-              <span className="material-symbols-outlined text-[16px]">podcasts</span>
+              <span className="material-symbols-outlined text-[16px]">{isVerifiedPort ? 'podcasts' : 'lock'}</span>
               <span>{vhfAlertSent ? 'BROADCAST LOGGED!' : 'Issue VHF Ch-16 Broadcast'}</span>
             </button>
-            <button 
-              onClick={() => alert('Port clearance log PDF generated.')}
-              className="p-2 rounded-lg border border-surface-container-high text-on-surface hover:bg-surface-container transition-colors"
-              title="Download Port Situation Brief"
+            <button
+              onClick={downloadSituationBrief}
+              disabled={generatingBrief}
+              className="p-2 rounded-lg border border-surface-container-high text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50"
+              title="Download Port Situation Brief (PDF)"
             >
-              <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+              <span className="material-symbols-outlined text-[18px]">{generatingBrief ? 'hourglass_top' : 'picture_as_pdf'}</span>
             </button>
           </div>
         </div>
@@ -104,7 +176,7 @@ export default function PortDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-pad-md">
         {/* Left Column: Harbour Approach GIS & Tide Curve (7 cols) */}
         <div className="lg:col-span-7 flex flex-col gap-pad-md">
-          <div className="rounded-xl bg-surface-container-lowest p-pad-md border border-surface-container-high/80 shadow-sm flex flex-col gap-pad-sm">
+          <div id="map" className="scroll-mt-28 rounded-xl bg-surface-container-lowest p-pad-md border border-surface-container-high/80 shadow-sm flex flex-col gap-pad-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-secondary text-[20px]">map</span>
@@ -119,13 +191,15 @@ export default function PortDashboard() {
             <TacticalGisMap height="320px" showLayers={true} />
           </div>
 
-          <SwellWindCurve />
+          <div id="forecast" className="scroll-mt-28">
+            <SwellWindCurve />
+          </div>
         </div>
 
         {/* Right Column: Statutory Warnings & AIS Queue Table (5 cols) */}
         <div className="lg:col-span-5 flex flex-col gap-pad-md">
           {/* Statutory Directives Card */}
-          <div className="rounded-xl bg-surface-container-lowest p-pad-md border border-surface-container-high/80 shadow-sm flex flex-col gap-2">
+          <div id="safety" className="scroll-mt-28 rounded-xl bg-surface-container-lowest p-pad-md border border-surface-container-high/80 shadow-sm flex flex-col gap-2">
             <h2 className="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
               <span className="material-symbols-outlined text-amber-600 text-[18px]">gavel</span>
               <span>Port Operational Directives</span>
@@ -149,7 +223,9 @@ export default function PortDashboard() {
           </div>
 
           {/* AIS Traffic & Berth Queue Table */}
-          <VesselTrafficTable />
+          <div id="traffic" className="scroll-mt-28">
+            <VesselTrafficTable />
+          </div>
 
           {/* Evidence Audit Strip */}
           <div className="flex items-center gap-2 flex-wrap text-xs">

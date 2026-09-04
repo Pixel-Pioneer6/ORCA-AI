@@ -1,23 +1,29 @@
 import React from 'react';
 import { useMarine } from '../../context/MarineContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+
+const TIER_TO_MARINE = { fisherman: 'fisher', ddmo: 'ddmo', port: 'port', researcher: 'researcher', authority: 'authority' };
+const MARINE_TO_TIER = { fisher: 'fisherman', ddmo: 'ddmo', port: 'port', researcher: 'researcher', authority: 'authority' };
 
 export default function HeaderDesktop() {
-  const { 
-    currentRole, 
-    setCurrentRole, 
-    themeMode, 
-    setThemeMode 
+  const {
+    currentRole,
+    setCurrentRole,
+    themeMode,
+    setThemeMode
   } = useMarine();
   const { language, setLanguage } = useLanguage();
+  const { isGuest, heldRoles, identity, openAuth, signOut } = useAuth();
 
   const roles = [
-    { id: 'fisher', label: 'VESSEL', sub: 'Mobile' },
     { id: 'ddmo', label: 'DDMO', sub: 'Disaster Ops' },
     { id: 'port', label: 'PORT', sub: 'Operations' },
     { id: 'researcher', label: 'SCIENTIFIC', sub: 'Climatology' },
     { id: 'authority', label: 'AUTHORITY', sub: 'Command' },
   ];
+
+  const isHeld = (id) => heldRoles.includes(MARINE_TO_TIER[id]);
 
   return (
     <header className="fixed top-8 inset-x-0 z-50 h-16 bg-primary-container text-white px-gutter-desktop flex items-center justify-between border-b border-white/10 shadow-md">
@@ -53,17 +59,22 @@ export default function HeaderDesktop() {
       <div className="flex items-center bg-black/30 p-1 rounded-xl border border-white/10">
         {roles.map((r) => {
           const isActive = currentRole === r.id;
+          const held = isHeld(r.id);
           return (
             <button
               key={r.id}
-              onClick={() => setCurrentRole(r.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex flex-col items-center ${
+              onClick={() => (held ? setCurrentRole(r.id) : openAuth(MARINE_TO_TIER[r.id]))}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex flex-col items-center relative ${
                 isActive
                   ? 'bg-secondary text-white shadow-sm'
                   : 'text-white/70 hover:text-white hover:bg-white/5'
               }`}
+              title={held ? undefined : 'Sign in to activate this role'}
             >
-              <span>{r.label}</span>
+              <span className="flex items-center gap-1">
+                {r.label}
+                {!held && <span className="material-symbols-outlined text-[13px]">lock</span>}
+              </span>
               <span className="text-[9px] opacity-70 font-normal">{r.sub}</span>
             </button>
           );
@@ -72,20 +83,24 @@ export default function HeaderDesktop() {
 
       {/* Right Tools: Language, Glare/Theme, User */}
       <div className="flex items-center gap-pad-sm">
-        {/* Language Toggle */}
+        {/* Language Toggle — previously EN/Tamil only, so an officer on any
+            desktop dashboard had no way to switch to Hindi or Malayalam
+            at all (only the mobile GovMasthead offered all four). */}
         <div className="flex items-center bg-white/10 rounded-lg p-0.5 text-xs font-bold">
-          <button
-            onClick={() => setLanguage('en')}
-            className={`px-2 py-1 rounded ${language === 'en' ? 'bg-secondary text-white' : 'text-white/70 hover:text-white'}`}
-          >
-            EN
-          </button>
-          <button
-            onClick={() => setLanguage('ta')}
-            className={`px-2 py-1 rounded ${language === 'ta' ? 'bg-secondary text-white' : 'text-white/70 hover:text-white'}`}
-          >
-            தமிழ்
-          </button>
+          {[
+            { code: 'en', label: 'EN' },
+            { code: 'ta', label: 'தமிழ்' },
+            { code: 'hi', label: 'हिं' },
+            { code: 'ml', label: 'മല' },
+          ].map((l) => (
+            <button
+              key={l.code}
+              onClick={() => setLanguage(l.code)}
+              className={`px-2 py-1 rounded ${language === l.code ? 'bg-secondary text-white' : 'text-white/70 hover:text-white'}`}
+            >
+              {l.label}
+            </button>
+          ))}
         </div>
 
         {/* Theme Toggle */}
@@ -100,15 +115,25 @@ export default function HeaderDesktop() {
         </button>
 
         {/* User Identity */}
-        <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-          <div className="w-8 h-8 rounded-full bg-secondary-container text-primary flex items-center justify-center font-bold text-xs">
-            VR
+        {isGuest ? (
+          <button
+            onClick={() => openAuth('authority')}
+            className="flex items-center gap-1.5 pl-3 ml-1 border-l border-white/10 text-xs font-bold text-white/90 hover:text-white"
+          >
+            <span className="material-symbols-outlined text-[18px]">login</span>
+            Sign In
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+            <div className="w-8 h-8 rounded-full bg-secondary-container text-primary flex items-center justify-center font-bold text-xs">
+              {identity?.value?.slice(0, 2).toUpperCase() || 'OP'}
+            </div>
+            <div className="hidden xl:flex flex-col text-left">
+              <span className="text-xs font-bold text-white leading-tight truncate max-w-[140px]">{identity?.value}</span>
+              <button onClick={signOut} className="text-[10px] text-white/60 hover:text-white text-left">Sign Out</button>
+            </div>
           </div>
-          <div className="hidden xl:flex flex-col text-left">
-            <span className="text-xs font-bold text-white leading-tight">V. Ramanathan</span>
-            <span className="text-[10px] text-white/60">Joint Ops Commander</span>
-          </div>
-        </div>
+        )}
       </div>
     </header>
   );

@@ -59,7 +59,7 @@ export default function GovMasthead({ variant = 'mobile' }) {
           <span className="hidden sm:inline">High Contrast</span>
         </button>
         <div className="flex items-center gap-0.5" role="group" aria-label="Language">
-          {['en', 'ta', 'hi'].map((lng) => (
+          {['en', 'ta', 'hi', 'ml'].map((lng) => (
             <button
               key={lng}
               onClick={() => setLanguage(lng)}

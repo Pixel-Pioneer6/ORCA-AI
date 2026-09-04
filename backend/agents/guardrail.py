@@ -1,71 +1,147 @@
-from typing import Dict, Any, Tuple
-from ..models.vessel import VesselProfile
+from typing import Dict, Any, Tuple, List, Optional
 
 class HydrodynamicGuardrail:
     """
-    DETERMINISTIC SAFETY GUARDRAIL (Zero-Hallucination Engine):
-    Guarantees that probabilistic LLM or agent outputs can NEVER recommend venturing 
-    out into sea conditions that exceed the certified physical limits of the mariner's vessel.
+    DETERMINISTIC SAFETY RULE ENGINE — PRD §9 (Zero-Hallucination Core):
+    The Safety verdict is strictly computed from physical thresholds, not from generation.
+    The LLM may explain the verdict; it may NOT change it.
     """
+
+    # PRD FR-2.4 — documented precedence rule for reconciling conflicting
+    # sources. Never silently averaged: the highest-precedence source that
+    # is actually available for this call decides the verdict, and the
+    # response says which tier that was.
+    SOURCE_PRECEDENCE = [
+        "official_warning",           # IMD/INCOIS/Tsunami bulletin (absolute override)
+        "national_agency_forecast",   # INCOIS OSF / MOSDAC buoy+scatterometer
+        "global_model",               # Copernicus/NOAA gap-fill (not yet wired — placeholder tier)
+        "cached_value",               # last-known-good, degrades freshness not availability
+    ]
+
+    VESSEL_CLASSES = {
+        "nonMotorized": {
+            "label": "Non-motorized / Catamaran (< 6m)",
+            "doNotVenture": {"wave": 1.5, "wind": 20.0},
+            "caution": {"wave": 1.0, "wind": 15.0},
+        },
+        "motorized": {
+            "label": "Motorized (< 10m)",
+            "doNotVenture": {"wave": 2.5, "wind": 25.0},
+            "caution": {"wave": 1.5, "wind": 18.0},
+        },
+        "mechanized": {
+            "label": "Mechanized (10–20m)",
+            "doNotVenture": {"wave": 3.5, "wind": 34.0},
+            "caution": {"wave": 2.5, "wind": 25.0},
+        },
+    }
+
+    @classmethod
+    def classify_vessel(cls, loa: float) -> str:
+        """Classifies vessel into canonical PRD §9 classes."""
+        if loa >= 10.0:
+            return "mechanized"
+        elif loa >= 6.0:
+            return "motorized"
+        return "nonMotorized"
 
     @classmethod
     def evaluate(
-        cls, 
-        vessel_loa: float, 
-        vessel_hp: float, 
-        swh: float, 
-        wind_gust: float,
-        proposed_verdict: str = "SAFE"
+        cls,
+        vessel_loa: float,
+        vessel_hp: float,
+        swh: Optional[float],
+        wind_gust: Optional[float],
+        cyclone_warning: bool = False,
+        squall_warning: bool = False,
+        swell_surge_alert: bool = False,
+        tsunami_bulletin: bool = False,
+        data_missing: bool = False,
+        proposed_verdict: str = "SAFE",
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Validates the proposed verdict against physical hydrodynamic constraints:
-        - Safe wave limit: ~18% of craft length LOA (e.g. 8.2m LOA -> 1.5m safe limit)
-        - Safe wind limit: 14 + (HP * 0.4) knots (e.g. 9.9 HP -> 18 kt safe limit)
+        Evaluates sea state against PRD §9 canonical thresholds and absolute overrides.
+        Returns (final_verdict, metadata_dict).
         """
-        craft_max_wave, craft_max_wind = VesselProfile.compute_safe_thresholds(vessel_loa, vessel_hp)
+        vessel_class = cls.classify_vessel(vessel_loa)
+        thresholds = cls.VESSEL_CLASSES[vessel_class]
 
-        # Exceedance calculations
-        wave_exceedance_pct = max(0.0, ((swh - craft_max_wave) / craft_max_wave) * 100.0)
-        wind_exceedance_pct = max(0.0, ((wind_gust - craft_max_wind) / craft_max_wind) * 100.0)
+        # PRD §9 Absolute Override 4: Required forecast variables unavailable
+        if data_missing or swh is None or wind_gust is None:
+            return "INSUFFICIENT_DATA", {
+                "is_clamped": True,
+                "original_proposed_verdict": proposed_verdict,
+                "final_verdict": "INSUFFICIENT_DATA",
+                "drivers": ["Required oceanographic variables unavailable — no acceptable fallback"],
+                "vessel_class": vessel_class,
+                "thresholds": thresholds,
+                "wave_exceedance_pct": 0.0,
+                "wind_exceedance_pct": 0.0,
+                "clamp_reason": "Missing telemetry: Deterministic engine refuses to guess ocean conditions.",
+                "source_tier": None,
+                "source_precedence": cls.SOURCE_PRECEDENCE,
+            }
 
-        clamped_verdict = proposed_verdict
-        clamp_reason = None
+        override_drivers = []
+        if cyclone_warning:
+            override_drivers.append("Active IMD cyclone warning covering this sector/time")
+        if squall_warning:
+            override_drivers.append("Active IMD squall warning covering nearshore fairway")
+        if swell_surge_alert:
+            override_drivers.append("INCOIS high-wave / swell-surge alert for this coastal segment")
+        if tsunami_bulletin:
+            override_drivers.append("National Tsunami Early Warning Centre bulletin in effect")
 
-        # Rule 1: Severe Wave Hazard (Wave > 140% of craft threshold or wave >= 2.5m)
-        if swh >= (craft_max_wave * 1.4) or swh >= 2.5:
-            clamped_verdict = "DO NOT VENTURE"
-            clamp_reason = (
-                f"Severe capsizing risk: Wave height of {swh}m exceeds craft limit ({craft_max_wave}m) "
-                f"by {wave_exceedance_pct:.1f}%."
-            )
+        # PRD §9 Absolute Overrides: Any active forces DO NOT VENTURE
+        if override_drivers:
+            return "DO NOT VENTURE", {
+                "is_clamped": True,
+                "original_proposed_verdict": proposed_verdict,
+                "final_verdict": "DO NOT VENTURE",
+                "drivers": override_drivers[:2],
+                "vessel_class": vessel_class,
+                "thresholds": thresholds,
+                "wave_exceedance_pct": 100.0,
+                "wind_exceedance_pct": 100.0,
+                "clamp_reason": f"Absolute Override Enforced: {override_drivers[0]}",
+                "source_tier": "official_warning",
+                "source_precedence": cls.SOURCE_PRECEDENCE,
+            }
 
-        # Rule 2: Squall Gust Exceedance (Wind > 130% of craft limit or wind >= 30 kt)
-        elif wind_gust >= (craft_max_wind * 1.3) or wind_gust >= 30.0:
-            clamped_verdict = "DO NOT VENTURE"
-            clamp_reason = (
-                f"Gale risk: Wind gusts of {wind_gust} kt exceed craft engine threshold ({craft_max_wind} kt)."
-            )
+        dnv_wave = thresholds["doNotVenture"]["wave"]
+        dnv_wind = thresholds["doNotVenture"]["wind"]
+        caut_wave = thresholds["caution"]["wave"]
+        caut_wind = thresholds["caution"]["wind"]
 
-        # Rule 3: Marginal Breaker Swell (Exceedance between 5% and 40%)
-        elif wave_exceedance_pct > 5.0 or wind_exceedance_pct > 5.0:
-            clamped_verdict = "CAUTION"
-            clamp_reason = (
-                f"Marginal conditions: Wave height ({swh}m) or wind ({wind_gust} kt) exceeds craft limit. "
-                f"Breaker swell hazard at shallow bar mouth."
-            )
+        wave_exceedance = round(max(0.0, ((swh - caut_wave) / caut_wave) * 100.0), 1)
+        wind_exceedance = round(max(0.0, ((wind_gust - caut_wind) / caut_wind) * 100.0), 1)
 
-        # Rule 4: Clean Water (< 100% of threshold and wind calm)
-        else:
-            if proposed_verdict not in ["DO NOT VENTURE", "CAUTION"]:
-                clamped_verdict = "SAFE"
+        drivers = []
+        if swh >= caut_wave:
+            drivers.append(f"Wave height {swh:.1f}m exceeds {caut_wave}m craft caution threshold")
+        if wind_gust >= caut_wind:
+            drivers.append(f"Wind gusts {round(wind_gust)}kt exceed {round(caut_wind)}kt craft caution threshold")
 
-        return clamped_verdict, {
-            "is_clamped": clamped_verdict != proposed_verdict,
+        final_verdict = "SAFE"
+        if swh >= dnv_wave or wind_gust >= dnv_wind:
+            final_verdict = "DO NOT VENTURE"
+            if not drivers:
+                drivers.append(f"Significant wave height {swh:.1f}m exceeds {dnv_wave}m danger threshold")
+        elif swh >= caut_wave or wind_gust >= caut_wind:
+            final_verdict = "CAUTION"
+
+        return final_verdict, {
+            "is_clamped": final_verdict != proposed_verdict,
             "original_proposed_verdict": proposed_verdict,
-            "final_verdict": clamped_verdict,
-            "clamp_reason": clamp_reason,
-            "craft_max_wave": craft_max_wave,
-            "craft_max_wind": craft_max_wind,
-            "wave_exceedance_pct": round(wave_exceedance_pct, 1),
-            "wind_exceedance_pct": round(wind_exceedance_pct, 1),
+            "final_verdict": final_verdict,
+            "drivers": drivers[:2] if drivers else ["Wave and wind within safe operating envelope"],
+            "vessel_class": vessel_class,
+            "thresholds": thresholds,
+            "wave_exceedance_pct": wave_exceedance,
+            "wind_exceedance_pct": wind_exceedance,
+            "craft_max_wave": dnv_wave,
+            "craft_max_wind": dnv_wind,
+            "clamp_reason": drivers[0] if drivers else None,
+            "source_tier": "national_agency_forecast",
+            "source_precedence": cls.SOURCE_PRECEDENCE,
         }

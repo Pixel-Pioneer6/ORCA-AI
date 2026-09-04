@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useMarine } from '../context/MarineContext';
+import { useLanguage } from '../context/LanguageContext';
 import TacticalGisMap from '../components/maps/TacticalGisMap';
 import EvidenceChip from '../components/common/EvidenceChip';
+import DisclaimerStrip from '../components/common/DisclaimerStrip';
 
 export default function PfzAdvisorPage() {
   const { setCurrentRoute, setIsVoiceOpen } = useMarine();
+  const { t } = useLanguage();
   const [selectedPfz, setSelectedPfz] = useState('pfz-1');
   const [showScientificBasis, setShowScientificBasis] = useState(false);
 
@@ -58,11 +61,11 @@ export default function PfzAdvisorPage() {
           className="flex items-center gap-1 text-xs font-bold text-secondary hover:underline"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          <span>Back to Home</span>
+          <span>{t('pfz.backToHome')}</span>
         </button>
         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-label-sm text-[10px] font-bold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-          <span>Oceansat-3 Ingest Live</span>
+          <span>{t('pfz.liveIngest')}</span>
         </div>
       </div>
 
@@ -77,21 +80,31 @@ export default function PfzAdvisorPage() {
               <span className="font-headline-md text-base font-bold text-on-surface">
                 {current.name}
               </span>
-              <span className="text-xs font-mono font-bold text-secondary">
-                {current.distance} · Bearing {current.bearing}
-              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs font-mono font-bold text-secondary">
+                  {current.distance} ({Math.round(parseFloat(current.distance) * 1.852 * 10) / 10} km) · Bearing {current.bearing}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] font-mono text-emerald-950 font-bold bg-emerald-100/80 px-2 py-0.5 rounded self-start">
+                <span className="material-symbols-outlined text-[14px]">timer</span>
+                <span>ETA: {Math.floor(parseFloat(current.distance) / 7)}h {Math.round(((parseFloat(current.distance) / 7) % 1) * 60)}m @ 7 kt</span>
+                <span className="text-[10px] text-emerald-800 font-normal">· Valid: Today 23:59 IST</span>
+              </div>
             </div>
           </div>
-          <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-950 font-mono text-xs font-bold">
-            Catch Prob: {current.prob}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-950 font-mono text-xs font-bold">
+              Catch Prob: {current.prob}
+            </span>
+            <span className="text-[9px] font-mono text-on-surface-variant">INCOIS WFS / ERDDAP</span>
+          </div>
         </div>
 
         {/* Primary Oceanographic Telemetry 2x2 Grid */}
         <div className="grid grid-cols-2 gap-2 pt-1">
           <div className="p-2.5 rounded-lg bg-surface-container-low border border-surface-container">
             <span className="font-label-sm text-[10px] uppercase font-bold text-on-surface-variant">
-              Chlorophyll-a Front
+              {t('pfz.chlFront')}
             </span>
             <div className="font-telemetry-sm text-sm font-bold text-emerald-800">
               {current.chl}
@@ -101,7 +114,7 @@ export default function PfzAdvisorPage() {
 
           <div className="p-2.5 rounded-lg bg-surface-container-low border border-surface-container">
             <span className="font-label-sm text-[10px] uppercase font-bold text-on-surface-variant">
-              SST Thermal Boundary
+              {t('pfz.sstBoundary')}
             </span>
             <div className="font-telemetry-sm text-sm font-bold text-emerald-800">
               {current.sst}
@@ -111,8 +124,8 @@ export default function PfzAdvisorPage() {
         </div>
 
         <div className="flex items-center justify-between text-xs p-2.5 rounded-lg bg-emerald-50 text-emerald-950 border border-emerald-200">
-          <span>Species Concentration: <strong>{current.species}</strong></span>
-          <span className="font-bold text-emerald-800">Fuel Savings: ~{current.fuelSave}</span>
+          <span>{t('pfz.speciesConcentration')}: <strong>{current.species}</strong></span>
+          <span className="font-bold text-emerald-800">{t('pfz.fuelSavings')}: ~{current.fuelSave}</span>
         </div>
       </section>
 
@@ -122,11 +135,11 @@ export default function PfzAdvisorPage() {
           <div className="flex items-center gap-1.5 text-amber-950">
             <span className="material-symbols-outlined text-[20px] text-amber-600">crisis_alert</span>
             <span className="font-headline-sm text-sm font-bold">
-              Corridor Transit Safety Assessment
+              {t('pfz.transitHeading')}
             </span>
           </div>
           <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-label-sm text-[10px] font-bold uppercase">
-            Caution on Transit
+            {t('pfz.transitCautionBadge')}
           </span>
         </div>
 
@@ -135,15 +148,16 @@ export default function PfzAdvisorPage() {
         </p>
 
         <div className="flex items-center justify-between pt-1 border-t border-amber-200 text-xs">
-          <span className="font-medium text-amber-900">Recommended Departure: <strong>After 10:00 IST</strong></span>
+          <span className="font-medium text-amber-900">{t('pfz.recommendedDeparture')}: <strong>After 10:00 IST</strong></span>
           <button
             onClick={() => setCurrentRoute('map')}
             className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold text-xs shadow-sm hover:bg-amber-700 transition-colors flex items-center gap-1"
           >
             <span className="material-symbols-outlined text-[14px]">route</span>
-            <span>Plot Safe Route</span>
+            <span>{t('pfz.plotSafeRoute')}</span>
           </button>
         </div>
+        <DisclaimerStrip className="pt-1 border-t border-amber-200" />
       </section>
 
       {/* Mini Nautical Vector Preview */}
@@ -152,7 +166,7 @@ export default function PfzAdvisorPage() {
       {/* 3. Ranked Nearby PFZ Alternatives */}
       <div className="flex flex-col gap-2">
         <span className="font-headline-sm text-sm font-bold text-on-surface px-1">
-          Ranked Nearby Potential Fishing Zones
+          {t('pfz.alternativesHeading')}
         </span>
         {pfzList.map((p) => (
           <button
@@ -194,7 +208,7 @@ export default function PfzAdvisorPage() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary text-[20px]">science</span>
             <span className="font-headline-sm text-sm font-bold text-on-surface">
-              Why is this a PFZ? (Scientific Oceanographic Basis)
+              {t('pfz.scientificBasisHeading')}
             </span>
           </div>
           <span className={`material-symbols-outlined text-[20px] text-on-surface-variant transition-transform ${showScientificBasis ? 'rotate-180' : ''}`}>
@@ -211,8 +225,8 @@ export default function PfzAdvisorPage() {
               Fish aggregate along the thermal gradients and chlorophyll fronts where nutrient-rich upwelling waters support high densities of phytoplankton and zooplankton.
             </p>
             <div className="flex items-center gap-2 pt-1 flex-wrap">
-              <EvidenceChip source="INCOIS PFZ ADVISORY" metric="DAILY" type="default" />
-              <EvidenceChip source="Oceansat-3 OCM" metric="LIVE" type="live" />
+              <EvidenceChip source="INCOIS PFZ ADVISORY" metric="DAILY" type="default" ledgerId="incois-pfz-advisory" />
+              <EvidenceChip source="Oceansat-3 OCM" metric="LIVE" type="live" ledgerId="oceansat3-ocm" />
             </div>
           </div>
         )}
@@ -224,7 +238,7 @@ export default function PfzAdvisorPage() {
         className="py-2.5 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-secondary text-xs font-bold flex items-center justify-center gap-2 transition-colors border border-surface-container-high"
       >
         <span className="material-symbols-outlined text-[18px]">record_voice_over</span>
-        <span>“Is there a calmer route to PFZ #01?”</span>
+        <span>&ldquo;{t('pfz.voiceHook')}&rdquo;</span>
       </button>
     </div>
   );
